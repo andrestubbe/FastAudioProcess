@@ -1,0 +1,36 @@
+@echo off
+echo ========================================
+echo FastAudioProcess Streaming Demo Runner
+echo ========================================
+
+:: 1. Compile and package the parent project
+echo.
+echo [1/3] Packaging parent library...
+call mvn clean package -DskipTests
+if %ERRORLEVEL% NEQ 0 (
+    echo [ERROR] Parent compilation failed.
+    exit /b 1
+)
+
+:: 2. Compile the Demo project
+echo.
+echo [2/3] Compiling StreamingDemo...
+cd examples\StreamingDemo
+call mvn compile
+if %ERRORLEVEL% NEQ 0 (
+    echo [ERROR] Demo compilation failed.
+    cd ..\..
+    exit /b 1
+)
+
+:: 3. Run the Demo
+echo.
+echo [3/3] Running StreamingDemo...
+java --add-modules jdk.incubator.vector -cp "target\classes;C:\Users\andre\.m2\repository\com\github\andrestubbe\FastCore\0.1.0\FastCore-0.1.0.jar;..\..\target\FastAudioProcess-0.1.0.jar;..\..\..\FastAudioPlayer\target\FastAudioPlayer-0.1.0.jar" fastaudioprocess.StreamingDemo
+
+cd ..\..
+echo.
+echo ========================================
+echo Demo Execution Complete
+echo ========================================
+pause

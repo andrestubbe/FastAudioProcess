@@ -333,4 +333,101 @@ public final class FastAudioProcess {
         
         return output;
     }
+
+    /**
+     * FrameChunker splits continuous incoming audio streams into overlapping windows
+     * tailored for neural networks (VAD, wake-word, STT).
+     */
+    public static class FrameChunker {
+        private final float[] buffer;
+        private final int chunkSize;
+        private final int hopSize;
+        private int writeIndex = 0;
+        private int readIndex = 0;
+        private int count = 0;
+
+        public FrameChunker(int chunkSize, int hopSize) {
+            this.chunkSize = chunkSize;
+            this.hopSize = hopSize;
+            this.buffer = new float[chunkSize * 8];
+        }
+
+        public synchronized void push(float[] samples) {
+            if (samples == null) return;
+            for (float s : samples) {
+                buffer[writeIndex] = s;
+                writeIndex = (writeIndex + 1) % buffer.length;
+                if (count < buffer.length) {
+                    count++;
+                } else {
+                    // Buffer overrun, drop oldest samples
+                    readIndex = (readIndex + 1) % buffer.length;
+                }
+            }
+        }
+
+        public synchronized float[] nextChunk() {
+            if (count < chunkSize) return null;
+            float[] chunk = new float[chunkSize];
+            int idx = readIndex;
+            for (int i = 0; i < chunkSize; i++) {
+                chunk[i] = buffer[idx];
+                idx = (idx + 1) % buffer.length;
+            }
+            readIndex = (readIndex + hopSize) % buffer.length;
+            count -= hopSize;
+            return chunk;
+        }
+        
+        public synchronized int availableSamples() {
+            return count;
+        }
+    }
+
+    /**
+     * Block-based Noise Gate to attenuate signals below the threshold.
+     */
+    public static void applyNoiseGate(float[] samples, float thresholdDb, float reductionDb) {
+        if (samples == null || samples.length == 0) return;
+        double threshold = Math.pow(10.0, thresholdDb / 20.0);
+        double reduction = Math.pow(10.0, reductionDb / 20.0);
+        int blockSize = 256;
+        for (int i = 0; i < samples.length; i += blockSize) {
+            int size = Math.min(blockSize, samples.length - i);
+            float peak = 0.0f;
+            for (int j = 0; j < size; j++) {
+                float abs = Math.abs(samples[i + j]);
+                if (abs > peak) peak = abs;
+            }
+            float multiplier = (peak < threshold) ? (float) reduction : 1.0f;
+            for (int j = 0; j < size; j++) {
+                samples[i + j] *= multiplier;
+            }
+        }
+    }
+
+    /**
+     * Real-time 3-band Equalizer utilizing Low-pass and High-pass crossover filters.
+     */
+    public static void apply3BandEqualizer(float[] samples, float bassGainDb, float midGainDb, float trebleGainDb) {
+        if (samples == null || samples.length == 0) return;
+        float bassGain = (float) Math.pow(10.0, bassGainDb / 20.0);
+        float midGain = (float) Math.pow(10.0, midGainDb / 20.0);
+        float trebleGain = (float) Math.pow(10.0, trebleGainDb / 20.0);
+
+        float lp = 0.0f;
+        float hp = 0.0f;
+        float alphaL = 0.15f; 
+        float alphaH = 0.75f; 
+
+        for (int i = 0; i < samples.length; i++) {
+            float input = samples[i];
+            lp = lp + alphaL * (input - lp);
+            float bass = lp;
+            hp = alphaH * (hp + input - (i > 0 ? samples[i-1] : input));
+            float treble = hp;
+            float mid = input - bass - treble;
+            samples[i] = bass * bassGain + mid * midGain + treble * trebleGain;
+        }
+    }
 }
