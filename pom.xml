@@ -27,6 +27,12 @@
             <artifactId>FastCore</artifactId>
             <version>0.1.0</version>
         </dependency>
+        <!-- MP3 SPI for AudioSystem support -->
+        <dependency>
+            <groupId>com.googlecode.soundlibs</groupId>
+            <artifactId>mp3spi</artifactId>
+            <version>1.9.5.4</version>
+        </dependency>
         <!-- JUnit 5 for testing -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>

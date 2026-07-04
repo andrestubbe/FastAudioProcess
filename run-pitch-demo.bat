@@ -26,7 +26,7 @@ if %ERRORLEVEL% NEQ 0 (
 :: 3. Run the Demo
 echo.
 echo [3/3] Running PitchDemo...
-java --add-modules jdk.incubator.vector -cp "target\classes;C:\Users\andre\.m2\repository\com\github\andrestubbe\FastCore\0.1.0\FastCore-0.1.0.jar;..\..\target\FastAudioProcess-0.1.0.jar;..\..\..\FastAudioPlayer\target\FastAudioPlayer-0.1.0.jar" fastaudioprocess.PitchDemo
+java --add-modules jdk.incubator.vector -cp "target\classes;C:\Users\andre\.m2\repository\com\github\andrestubbe\FastCore\0.1.0\FastCore-0.1.0.jar;..\..\target\FastAudioProcess-0.1.0.jar;..\..\..\FastAudioPlayer\target\FastAudioPlayer-0.1.0.jar;C:\Users\andre\.m2\repository\com\googlecode\soundlibs\mp3spi\1.9.5.4\mp3spi-1.9.5.4.jar;C:\Users\andre\.m2\repository\com\googlecode\soundlibs\jlayer\1.0.1.4\jlayer-1.0.1.4.jar;C:\Users\andre\.m2\repository\com\googlecode\soundlibs\tritonus-share\0.3.7.4\tritonus-share-0.3.7.4.jar" fastaudioprocess.PitchDemo
 
 cd ..\..
 echo.
