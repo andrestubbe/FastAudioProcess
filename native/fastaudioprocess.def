@@ -4,3 +4,5 @@ EXPORTS
     ; Format: Java_packagename_Classname_methodName
     
     Java_fastaudioprocess_FastAudioProcess_doSomethingNative
+    Java_fastaudioprocess_FastAudioProcess_detectPitchNative
+    Java_fastaudioprocess_FastAudioProcess_pitchShiftNative

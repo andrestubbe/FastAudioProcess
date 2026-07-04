@@ -10,6 +10,55 @@ import jdk.incubator.vector.VectorSpecies;
  */
 public final class FastAudioProcess {
 
+    private static final String LIBRARY_NAME = "fastaudioprocess";
+    static {
+        loadNativeLibrary();
+    }
+
+    private static void loadNativeLibrary() {
+        try {
+            System.loadLibrary(LIBRARY_NAME);
+        } catch (UnsatisfiedLinkError e) {
+            try {
+                String libResource = "/native/" + LIBRARY_NAME + ".dll";
+                try (InputStream in = FastAudioProcess.class.getResourceAsStream(libResource)) {
+                    if (in == null) {
+                        libResource = "/" + LIBRARY_NAME + ".dll";
+                        try (InputStream in2 = FastAudioProcess.class.getResourceAsStream(libResource)) {
+                            if (in2 != null) {
+                                loadFromStream(in2);
+                            }
+                        }
+                    } else {
+                        loadFromStream(in);
+                    }
+                }
+            } catch (Exception ex) {
+                System.err.println("Note: Native fastaudioprocess library could not be loaded: " + ex.getMessage());
+            }
+        }
+    }
+
+    private static void loadFromStream(InputStream in) throws Exception {
+        java.nio.file.Path tempDir = java.nio.file.Files.createTempDirectory("fastaudioprocess");
+        java.nio.file.Path tempLib = tempDir.resolve("fastaudioprocess.dll");
+        java.nio.file.Files.copy(in, tempLib, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        tempLib.toFile().deleteOnExit();
+        tempDir.toFile().deleteOnExit();
+        System.load(tempLib.toString());
+    }
+
+    /**
+     * Estimates the fundamental frequency (pitch) of voice samples using native autocorrelation.
+     */
+    public static native float detectPitchNative(float[] samples, int sampleRate);
+
+    /**
+     * Shifts the pitch of the samples by the specified semitones natively without changing the speed/duration (using SOLA).
+     */
+    public static native void pitchShiftNative(float[] samples, float semitones, int sampleRate);
+
+
     /**
      * Converts a standard MP3 file to 44100Hz Stereo 16-bit WAV PCM format.
      */
