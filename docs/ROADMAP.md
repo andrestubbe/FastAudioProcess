@@ -7,27 +7,31 @@
 - [x] **Resampling**: Wave resampling to 44100Hz.
 - [x] **SIMD RMS Volume Calculation**: High-performance volume level computation accelerated by Java 17 Vector API (SIMD).
 
-## 🟡 v0.1.1: Next steps (Collected requirements)
-- [ ] **Wake-Word Integration Utilities**:
-  - **Wake-Word Optimized VAD-Frames**: Voice Activity Detection helper for frame segmentation.
-  - **Frame Normalization**: Energy-sensitive amplitude normalization.
-  - **Band-limited Pre-Emphasis Filter**: High-pass filtering to boost higher speech frequencies.
-  - **Modellfriendly Frame-Chunking Pipelines**: Buffering audio frames tailored to wake-word neural networks.
-- [ ] **Log-Mel Feature Extraction**: Ultra-fast extraction of MFCCs / Log-Mel spectrograms for local speech models.
-- [ ] **Audio-Manipulation Library**:
-  - Equalizer (IIR/FIR filters)
-  - Dynamic Processing (Compressor / Limiter / Noise Gate)
-  - Reverb / Delay / Pitch-Shifting & Time-Stretching
-- [ ] **Audio I/O & Mixing**:
-  - Multi-channel mixing (downmix / upmix)
-  - Ring-buffering / Zero-Copy audio pipelines
-- [ ] **Local AI Models Substrate**:
-  - Native integration helper for Whisper (STT) and local TTS engine (Style-TTS/VITS)
-  - Fast Audio Embedding extraction (CLAP/Wav2Vec)
-  - Native Voice Activity Detection (VAD) (Silero, etc.)
-  - AI Noise Reduction (RNNoise / Demucs)
+## 🟢 v0.1.1: Audio DSP, FX & VAD Release (Current)
+- [x] **Wake-Word Integration Utilities**:
+  - [x] **Wake-Word Optimized VAD-Frames**: Voice Activity Detection helper for frame segmentation.
+  - [x] **Frame Normalization**: Energy-sensitive amplitude normalization.
+  - [x] **Band-limited Pre-Emphasis Filter**: High-pass filtering to boost higher speech frequencies.
+  - [x] **Modellfriendly Frame-Chunking Pipelines**: Buffering audio frames tailored to wake-word neural networks.
+- [x] **Log-Mel Feature Extraction**: Ultra-fast extraction of MFCCs / Log-Mel spectrograms for local speech models.
+- [x] **Audio-Manipulation & FX Library**:
+  - [x] Equalizer (IIR/FIR crossover filters)
+  - [x] Dynamic Processing (Noise Gate)
+  - [x] Pitch-Shifting (Native speed-preserved & resampling-based)
+- [x] **Audio I/O & Mixing**:
+  - [x] Multi-channel mixing (downmix / upmix)
+- [x] **Local AI Models Substrate**:
+  - [x] Native Voice Activity Detection (VAD) (Silero VAD v5 ONNX Integration)
+
+## 🟡 v0.1.2: Future steps
+- [ ] **Whisper & TTS Substrates**:
+  - Native integration helper for Whisper (STT) and local TTS engine (Style-TTS/VITS).
+- [ ] **Fast Audio Embedding extraction**:
+  - CLAP/Wav2Vec ONNX extraction.
+- [ ] **AI Noise Reduction**:
+  - RNNoise / Demucs JNI bindings.
 - [ ] **CREAM Integration**:
-  - Audio event markers on timetables and timeline node snapshots
+  - Audio event markers on timetables and timeline node snapshots.
 
 ---
 **Focus:** Performance is our USP. We optimize where Java stops.

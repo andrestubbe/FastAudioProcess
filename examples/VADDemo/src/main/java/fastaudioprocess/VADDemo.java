@@ -69,6 +69,12 @@ public class VADDemo {
                 if (Math.abs(s) > maxSample) maxSample = Math.abs(s);
             }
             System.out.printf("Max audio sample amplitude: %.5f\n", maxSample);
+            
+            System.out.print("First 20 resampled audio samples: [");
+            for (int idx = 0; idx < Math.min(20, samples.length); idx++) {
+                System.out.printf("%.5f ", samples[idx]);
+            }
+            System.out.println("]");
 
             // Normalize audio to avoid low volume issues in VAD
             if (maxSample > 0.0001f) {

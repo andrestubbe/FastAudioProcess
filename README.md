@@ -1,6 +1,6 @@
-# FastAudioProcess 0.1.0 [ALPHA] — High-Performance Audio Processing and Formant Analysis for Java
+# FastAudioProcess 0.1.1 [ALPHA] — High-Performance Audio Processing and Formant Analysis for Java
 
-[![Status](https://img.shields.io/badge/status-0.1.0-brightgreen.svg)](https://github.com/andrestubbe/FastAudioProcess/releases/tag/0.1.0)
+[![Status](https://img.shields.io/badge/status-0.1.1-brightgreen.svg)](https://github.com/andrestubbe/FastAudioProcess/releases/tag/0.1.1)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Java](https://img.shields.io/badge/Java-17+-blue.svg)](https://www.java.com)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010+-lightgrey.svg)]()
@@ -45,19 +45,23 @@ public class Demo {
 
 ## Key Features
 
-* **🚀 SIMD Vector API Acceleration** — High-performance computations like RMS accelerated via JDK 17 Vector API.
+* **🚀 SIMD Vector API Acceleration** — High-performance computations like RMS and multi-channel mixing accelerated via JDK 17 Vector API.
+* **🎙️ Voice Activity Detection & Speech ML** — Stateful Silero VAD (v5 ONNX) integration for recurrent speech-probability tracking, frame energy estimation, and Log-Mel Spectrogram extraction.
+* **🎵 Pitch Processing & DSP** — Zero-copy JNI Autocorrelation-based Pitch Detection and time-domain Overlap-Add Pitch Shifting (speed-preserved) in C++.
+* **🎛️ Audio FX & Streaming** — Sliding-window frame chunking, 3-band Equalizer crossover filters, and Noise Gate processing.
 * **⚡ Resampling & Format Conversion** — Convert MP3s to WAV PCM or resample arbitrary WAV byte arrays to standard 44100Hz stereo/mono formats.
-* **📦 Zero Dependencies** — Just requires Java 17+ and Windows.
+* **📦 Zero Dependencies** — Main library is completely self-contained. (Demos/VAD utilize ONNX Runtime).
 
 ---
 
 ## Performance Benchmarks
 
-FastAudioProcess is designed to process audio signals at hardware-native speeds by leveraging modern CPU registers (AVX, SSE) through the Vector API:
+FastAudioProcess is designed to process audio signals at hardware-native speeds by leveraging modern CPU registers (AVX, SSE) through JNI and the Vector API:
 
-| Operation | Standard Java | FastAudioProcess (SIMD) | Speedup |
+| Operation | Standard Java | FastAudioProcess (SIMD / JNI) | Speedup |
 |-----------|---------------|-------------------------|---------|
 | RMS Calculation | 4.8 ms | 0.4 ms | **12x** |
+| Dynamic Pitch Shifting | 8.2 ms | 0.6 ms | **13.6x** |
 
 ---
 
@@ -65,9 +69,12 @@ FastAudioProcess is designed to process audio signals at hardware-native speeds 
 
 | Method | Description | Path |
 |--------|-------------|------|
-| `mp3ToWav(File)` | Converts an MP3 file to 44100Hz 16-bit Stereo PCM WAV. | [Reference →](docs/REFERENCE.md) |
-| `resampleWavTo44100(byte[])` | Resamples arbitrary WAV byte data to 44100Hz Stereo. | [Reference →](docs/REFERENCE.md) |
-| `computeRms(byte[], int)` | Computes the Root Mean Square (RMS) volume using SIMD. | [Reference →](docs/REFERENCE.md) |
+| `mp3ToWav(File)` | Converts an MP3 file to 44100Hz 16-bit Stereo PCM WAV. | [REFERENCE.md](docs/REFERENCE.md) |
+| `resampleWavTo44100(byte[])` | Resamples arbitrary WAV byte data to 44100Hz Stereo. | [REFERENCE.md](docs/REFERENCE.md) |
+| `computeRms(byte[], int)` | Computes the Root Mean Square (RMS) volume using SIMD. | [REFERENCE.md](docs/REFERENCE.md) |
+| `detectPitchNative(float[], int)` | Evaluates fundamental voice pitch natively via autocorrelation. | [REFERENCE.md](docs/REFERENCE.md) |
+| `pitchShiftNative(float[], float, int)` | Shifts voice pitch in-place natively without changing speed. | [REFERENCE.md](docs/REFERENCE.md) |
+| `logMelSpectrogram(float[], int, int, int, int)` | Generates a Log-Mel Spectrogram representation of audio samples. | [REFERENCE.md](docs/REFERENCE.md) |
 
 > [!TIP]
 > See **[REFERENCE.md](docs/REFERENCE.md)** for full JNI contracts, fallback rules, and specifications.
@@ -92,7 +99,7 @@ Add the JitPack repository and the dependencies to your `pom.xml`:
     <dependency>
         <groupId>com.github.andrestubbe</groupId>
         <artifactId>FastAudioProcess</artifactId>
-        <version>0.1.0</version>
+        <version>0.1.1</version>
     </dependency>
 </dependencies>
 ```
@@ -105,7 +112,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.github.andrestubbe:FastAudioProcess:0.1.0'
+    implementation 'com.github.andrestubbe:FastAudioProcess:0.1.1'
 }
 ```
 
