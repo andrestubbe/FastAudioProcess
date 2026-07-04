@@ -147,4 +147,190 @@ public final class FastAudioProcess {
         
         return (float) (Math.sqrt((double) sum / count) / 32768.0);
     }
+
+    /**
+     * Applies a high-pass pre-emphasis filter to the audio samples in-place.
+     * Formula: y[n] = x[n] - factor * x[n-1]
+     */
+    public static void preEmphasis(float[] samples, float factor) {
+        if (samples == null || samples.length <= 1) return;
+        for (int i = samples.length - 1; i > 0; i--) {
+            samples[i] = samples[i] - factor * samples[i - 1];
+        }
+    }
+
+    /**
+     * Normalizes the amplitude of the audio samples in-place so that the peak reaches targetPeak.
+     * Accelerated using the Java 17 Vector API (SIMD).
+     */
+    public static void normalize(float[] samples, float targetPeak) {
+        if (samples == null || samples.length == 0 || targetPeak <= 0) return;
+        int len = samples.length;
+        
+        // Find absolute maximum peak
+        float maxVal = 0.0f;
+        int i = 0;
+        int limit = len - (len % SPECIES.length());
+        
+        jdk.incubator.vector.FloatVector maxVector = jdk.incubator.vector.FloatVector.zero(SPECIES);
+        for (; i < limit; i += SPECIES.length()) {
+            jdk.incubator.vector.FloatVector v = jdk.incubator.vector.FloatVector.fromArray(SPECIES, samples, i);
+            maxVector = maxVector.max(v.abs());
+        }
+        
+        maxVal = maxVector.reduceLanes(jdk.incubator.vector.VectorOperators.MAX);
+        for (; i < len; i++) {
+            float absVal = Math.abs(samples[i]);
+            if (absVal > maxVal) {
+                maxVal = absVal;
+            }
+        }
+        
+        if (maxVal == 0.0f) return;
+        
+        // Scale elements using Vector multiplication
+        float scale = targetPeak / maxVal;
+        jdk.incubator.vector.FloatVector scaleVector = jdk.incubator.vector.FloatVector.broadcast(SPECIES, scale);
+        
+        i = 0;
+        for (; i < limit; i += SPECIES.length()) {
+            jdk.incubator.vector.FloatVector v = jdk.incubator.vector.FloatVector.fromArray(SPECIES, samples, i);
+            v.mul(scaleVector).intoArray(samples, i);
+        }
+        for (; i < len; i++) {
+            samples[i] *= scale;
+        }
+    }
+
+    /**
+     * Computes the average frame energy for Voice Activity Detection (VAD).
+     */
+    public static float computeFrameEnergy(short[] samples, int offset, int length) {
+        if (samples == null || length <= 0) return 0.0f;
+        double sum = 0.0;
+        for (int i = 0; i < length; i++) {
+            double val = samples[offset + i] / 32768.0;
+            sum += val * val;
+        }
+        return (float) (sum / length);
+    }
+
+    /**
+     * Generates a Log-Mel Spectrogram representation of the audio samples.
+     * Maps linear FFT frequency bins onto Mel-frequency scale bins.
+     */
+    public static float[][] logMelSpectrogram(float[] samples, int sampleRate, int fftSize, int hopSize, int melBins) {
+        int len = samples.length;
+        int numFrames = (len - fftSize) / hopSize + 1;
+        if (numFrames <= 0) return new float[0][0];
+        
+        float[][] melSpec = new float[numFrames][melBins];
+        
+        // Compute Hann window
+        float[] window = new float[fftSize];
+        for (int i = 0; i < fftSize; i++) {
+            window[i] = (float) (0.5 * (1.0 - Math.cos(2.0 * Math.PI * i / (fftSize - 1))));
+        }
+        
+        // DFT and Mel filtering
+        for (int f = 0; f < numFrames; f++) {
+            int startIdx = f * hopSize;
+            float[] frame = new float[fftSize];
+            for (int i = 0; i < fftSize; i++) {
+                frame[i] = samples[startIdx + i] * window[i];
+            }
+            
+            int specSize = fftSize / 2 + 1;
+            float[] mag = new float[specSize];
+            for (int k = 0; k < specSize; k++) {
+                float real = 0.0f;
+                float imag = 0.0f;
+                for (int n = 0; n < fftSize; n++) {
+                    double angle = 2.0 * Math.PI * k * n / fftSize;
+                    real += frame[n] * Math.cos(angle);
+                    imag -= frame[n] * Math.sin(angle);
+                }
+                mag[k] = (float) Math.sqrt(real * real + imag * imag);
+            }
+            
+            for (int m = 0; m < melBins; m++) {
+                int centerLinear = kIndexForMel(m, sampleRate, fftSize, melBins);
+                float energy = 0.0f;
+                int width = Math.max(1, specSize / melBins);
+                int startBin = Math.max(0, centerLinear - width);
+                int endBin = Math.min(specSize - 1, centerLinear + width);
+                for (int k = startBin; k <= endBin; k++) {
+                    energy += mag[k];
+                }
+                melSpec[f][m] = (float) Math.log(Math.max(1e-5f, energy));
+            }
+        }
+        return melSpec;
+    }
+    
+    private static int kIndexForMel(int melBin, int sampleRate, int fftSize, int melBins) {
+        double minMel = 0.0;
+        double maxMel = 2595.0 * Math.log10(1.0 + (sampleRate / 2.0) / 700.0);
+        double mel = minMel + ((double) melBin / melBins) * (maxMel - minMel);
+        double freq = 700.0 * (Math.pow(10.0, mel / 2595.0) - 1.0);
+        return (int) Math.round((freq * fftSize) / sampleRate);
+    }
+
+    /**
+     * Resamples the audio samples to shift the pitch by the specified semitones.
+     * Positive semitones speed up and raise pitch, negative slow down and lower pitch.
+     */
+    public static float[] pitchShiftResample(float[] samples, float semitones) {
+        if (samples == null || samples.length == 0 || semitones == 0.0f) return samples;
+        double factor = Math.pow(2.0, semitones / 12.0);
+        int newLen = (int) (samples.length / factor);
+        float[] output = new float[newLen];
+        for (int i = 0; i < newLen; i++) {
+            double srcIndex = i * factor;
+            int base = (int) srcIndex;
+            double frac = srcIndex - base;
+            if (base < samples.length - 1) {
+                output[i] = (float) ((1.0 - frac) * samples[base] + frac * samples[base + 1]);
+            } else {
+                output[i] = samples[samples.length - 1];
+            }
+        }
+        return output;
+    }
+
+    /**
+     * Mixes multiple audio channels using weights.
+     * Accelerated using the Java 17 Vector API (SIMD).
+     */
+    public static float[] mixChannels(float[][] channels, float[] weights) {
+        if (channels == null || channels.length == 0) return new float[0];
+        int numChannels = channels.length;
+        int len = channels[0].length;
+        float[] output = new float[len];
+        
+        int i = 0;
+        int limit = len - (len % SPECIES.length());
+        
+        for (; i < limit; i += SPECIES.length()) {
+            jdk.incubator.vector.FloatVector mixVector = jdk.incubator.vector.FloatVector.zero(SPECIES);
+            for (int c = 0; c < numChannels; c++) {
+                float w = (weights != null && c < weights.length) ? weights[c] : 1.0f / numChannels;
+                jdk.incubator.vector.FloatVector wVector = jdk.incubator.vector.FloatVector.broadcast(SPECIES, w);
+                jdk.incubator.vector.FloatVector cVector = jdk.incubator.vector.FloatVector.fromArray(SPECIES, channels[c], i);
+                mixVector = mixVector.add(cVector.mul(wVector));
+            }
+            mixVector.intoArray(output, i);
+        }
+        
+        for (; i < len; i++) {
+            float sum = 0.0f;
+            for (int c = 0; c < numChannels; c++) {
+                float w = (weights != null && c < weights.length) ? weights[c] : 1.0f / numChannels;
+                sum += channels[c][i] * w;
+            }
+            output[i] = sum;
+        }
+        
+        return output;
+    }
 }
