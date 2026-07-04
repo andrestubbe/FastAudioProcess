@@ -8,9 +8,6 @@ import java.io.FileOutputStream;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import javax.sound.sampled.AudioFileFormat;
 import javax.sound.sampled.AudioFormat;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
@@ -42,7 +39,7 @@ public class VADDemo {
                 System.out.println("Using local model: " + modelFile.getAbsolutePath());
             }
 
-            // 2. Load opinions.mp3 and convert to 16kHz mono WAV
+            // 2. Load opinions.mp3 and convert to WAV
             File mp3File = new File("../../opinions.mp3");
             if (!mp3File.exists()) {
                 mp3File = new File("../opinions.mp3");
@@ -57,14 +54,31 @@ public class VADDemo {
             }
 
             System.out.println("Found MP3: " + mp3File.getAbsolutePath());
-            System.out.println("Converting MP3 to WAV...");
+            System.out.println("Converting MP3 to WAV (44.1kHz Stereo)...");
             File wav44k = FastAudioProcess.mp3ToWav(mp3File);
-            System.out.println("Converting WAV to 16kHz Mono...");
-            File wav16k = convertTo16kHzMono(wav44k);
 
-            // 3. Read 16kHz samples
-            float[] samples = readWavSamples(wav16k);
-            System.out.printf("Loaded %d speech samples at 16000 Hz.\n", samples.length);
+            // 3. Read 44.1kHz samples and resample to 16kHz Mono in memory
+            float[] audio44k = readWavSamples(wav44k);
+            System.out.printf("Loaded %d samples at 44100 Hz. Resampling to 16000 Hz...\n", audio44k.length);
+            float[] samples = resample(audio44k, 44100f, 16000f);
+            System.out.printf("Resampled to %d samples at 16000 Hz.\n", samples.length);
+
+            // Check if audio has non-zero signal
+            float maxSample = 0f;
+            for (float s : samples) {
+                if (Math.abs(s) > maxSample) maxSample = Math.abs(s);
+            }
+            System.out.printf("Max audio sample amplitude: %.5f\n", maxSample);
+
+            // Normalize audio to avoid low volume issues in VAD
+            if (maxSample > 0.0001f) {
+                float targetPeak = 0.8f;
+                float scale = targetPeak / maxSample;
+                for (int i = 0; i < samples.length; i++) {
+                    samples[i] *= scale;
+                }
+                System.out.println("Normalized audio to 0.8 peak amplitude.");
+            }
 
             // 4. Initialize Silero VAD
             System.out.println("Initializing Silero VAD...");
@@ -101,24 +115,22 @@ public class VADDemo {
         }
     }
 
-    private static File convertTo16kHzMono(File originalWav) throws Exception {
-        AudioInputStream sourceStream = AudioSystem.getAudioInputStream(originalWav);
-        AudioFormat targetFormat = new AudioFormat(
-            AudioFormat.Encoding.PCM_SIGNED,
-            16000.0f,
-            16,
-            1,
-            2,
-            16000.0f,
-            false
-        );
-        AudioInputStream targetStream = AudioSystem.getAudioInputStream(targetFormat, sourceStream);
-        File temp16k = File.createTempFile("process_16k_", ".wav");
-        temp16k.deleteOnExit();
-        AudioSystem.write(targetStream, AudioFileFormat.Type.WAVE, temp16k);
-        targetStream.close();
-        sourceStream.close();
-        return temp16k;
+    private static float[] resample(float[] input, float sourceRate, float targetRate) {
+        if (sourceRate == targetRate) return input;
+        double factor = (double) sourceRate / targetRate;
+        int targetLength = (int) (input.length / factor);
+        float[] output = new float[targetLength];
+        for (int i = 0; i < targetLength; i++) {
+            double srcIndex = i * factor;
+            int base = (int) srcIndex;
+            double frac = srcIndex - base;
+            if (base < input.length - 1) {
+                output[i] = (float) ((1.0 - frac) * input[base] + frac * input[base + 1]);
+            } else {
+                output[i] = input[input.length - 1];
+            }
+        }
+        return output;
     }
 
     private static float[] readWavSamples(File wavFile) throws Exception {
