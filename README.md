@@ -70,7 +70,7 @@ FastAudioProcess is designed to process audio signals at hardware-native speeds 
 | `computeRms(byte[], int)` | Computes the Root Mean Square (RMS) volume using SIMD. | [Reference →](docs/REFERENCE.md) |
 
 > [!TIP]
-> See **[docs/REFERENCE.md](docs/REFERENCE.md)** for full JNI contracts, fallback rules, and specifications.
+> See **[REFERENCE.md](docs/REFERENCE.md)** for full JNI contracts, fallback rules, and specifications.
 
 ---
 
