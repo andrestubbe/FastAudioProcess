@@ -6,7 +6,7 @@ echo ========================================
 :: 1. Compile and package the parent project
 echo.
 echo [1/3] Packaging parent library...
-call mvn clean package -DskipTests
+call mvn clean package -DskipTests >nul
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] Parent compilation failed.
     exit /b 1
@@ -16,7 +16,7 @@ if %ERRORLEVEL% NEQ 0 (
 echo.
 echo [2/3] Compiling StreamingDemo...
 cd examples\StreamingDemo
-call mvn compile
+call mvn compile >nul
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] Demo compilation failed.
     cd ..\..
