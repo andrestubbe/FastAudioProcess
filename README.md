@@ -113,11 +113,11 @@ dependencies {
 
 ## Documentation
 
-* **[docs/REFERENCE.md](docs/REFERENCE.md)**: Full technical specification and JNI contracts.
-* **[docs/PHILOSOPHY.md](docs/PHILOSOPHY.md)**: The "Native-First" philosophy.
-* **[docs/ROADMAP.md](docs/ROADMAP.md)**: Future development, including wake-word VAD helper routines.
-* **[docs/CHANGELOG.md](docs/CHANGELOG.md)**: Project history.
-* **[docs/COMPILE.md](docs/COMPILE.md)**: Compilation guide.
+* **[REFERENCE.md](docs/REFERENCE.md)**: Full technical specification and JNI contracts.
+* **[PHILOSOPHY.md](docs/PHILOSOPHY.md)**: The "Native-First" philosophy.
+* **[ROADMAP.md](docs/ROADMAP.md)**: Future development, including wake-word VAD helper routines.
+* **[CHANGELOG.md](docs/CHANGELOG.md)**: Project history.
+* **[COMPILE.md](docs/COMPILE.md)**: Compilation guide.
 
 ---
 
