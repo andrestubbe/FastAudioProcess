@@ -479,4 +479,58 @@ public final class FastAudioProcess {
             samples[i] = bass * bassGain + mid * midGain + treble * trebleGain;
         }
     }
+
+    /**
+     * Downsamples a large array of float samples into exactly targetPoints peak values
+     * (the absolute maximum in each segment) for rendering / timeline visualization.
+     */
+    public static float[] generateWaveformPoints(float[] samples, int targetPoints) {
+        if (samples == null || samples.length == 0 || targetPoints <= 0) {
+            return new float[0];
+        }
+        float[] points = new float[targetPoints];
+        double blockSize = (double) samples.length / targetPoints;
+        for (int i = 0; i < targetPoints; i++) {
+            int start = (int) (i * blockSize);
+            int end = (int) ((i + 1) * blockSize);
+            if (end > samples.length) end = samples.length;
+            float max = 0.0f;
+            for (int j = start; j < end; j++) {
+                float abs = Math.abs(samples[j]);
+                if (abs > max) max = abs;
+            }
+            points[i] = max;
+        }
+        return points;
+    }
+
+    /**
+     * Returns the maximum absolute peak value of a single audio frame.
+     */
+    public static float getFramePeak(float[] samples) {
+        if (samples == null || samples.length == 0) return 0.0f;
+        float max = 0.0f;
+        for (float s : samples) {
+            float abs = Math.abs(s);
+            if (abs > max) max = abs;
+        }
+        return max;
+    }
+
+    /**
+     * Helper to generate a text-based ASCII visual volume meter for console diagnostics.
+     */
+    public static String getAsciiVolumeBar(float peak, int width) {
+        if (width <= 0) return "";
+        int numChars = Math.round(Math.max(0.0f, Math.min(1.0f, peak)) * width);
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < width; i++) {
+            if (i < numChars) {
+                sb.append("=");
+            } else {
+                sb.append("-");
+            }
+        }
+        return sb.toString();
+    }
 }

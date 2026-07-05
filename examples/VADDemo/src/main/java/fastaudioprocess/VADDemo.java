@@ -70,8 +70,17 @@ public class VADDemo {
             }
             System.out.printf("Max audio sample amplitude: %.5f\n", maxSample);
             
-            System.out.print("First 20 resampled audio samples: [");
-            for (int idx = 0; idx < Math.min(20, samples.length); idx++) {
+            // Find a high-amplitude section to print (Option 1 Diagnostic)
+            int startIdx = 0;
+            for (int i = 0; i < samples.length; i++) {
+                if (Math.abs(samples[i]) > 0.1f) {
+                    startIdx = i;
+                    break;
+                }
+            }
+            System.out.printf("High-amplitude section starts at sample %d. Printing 20 samples:\n", startIdx);
+            System.out.print("[");
+            for (int idx = startIdx; idx < Math.min(startIdx + 20, samples.length); idx++) {
                 System.out.printf("%.5f ", samples[idx]);
             }
             System.out.println("]");
@@ -86,17 +95,36 @@ public class VADDemo {
                 System.out.println("Normalized audio to 0.8 peak amplitude.");
             }
 
-            // 4. Initialize Silero VAD
-            System.out.println("Initializing Silero VAD...");
+            // 4. Generate & Display Timeline Waveform (All-at-once downsampling)
+            System.out.println("\n--- Step 4: Generating Downsampled Timeline Waveform ---");
+            float[] wavePoints = FastAudioProcess.generateWaveformPoints(samples, 50);
+            System.out.print("Timeline Waveform Peak Levels:\n[");
+            for (float p : wavePoints) {
+                // simple height indicator using standard ASCII
+                int height = (int) (p * 8);
+                if (height <= 0) System.out.print(" ");
+                else if (height == 1) System.out.print(".");
+                else if (height == 2) System.out.print(":");
+                else if (height == 3) System.out.print("-");
+                else if (height == 4) System.out.print("=");
+                else if (height == 5) System.out.print("+");
+                else if (height == 6) System.out.print("*");
+                else if (height == 7) System.out.print("#");
+                else System.out.print("%");
+            }
+            System.out.println("]");
+
+            // 5. Initialize Silero VAD
+            System.out.println("\nInitializing Silero VAD...");
             try (SileroVAD vad = new SileroVAD(modelFile.getAbsolutePath())) {
                 
                 int frameSize = 512; // Required frame size
                 int step = 512;      // Non-overlapping step
                 int totalFrames = samples.length / frameSize;
                 
-                System.out.println("\n--- Step 5: Streaming VAD Speech Probability Timeline ---");
-                System.out.println("Time (sec) | Speech Probability | Speech Detected");
-                System.out.println("---------------------------------------------");
+                System.out.println("\n--- Step 6: Streaming VAD Speech Probability & Level Timeline ---");
+                System.out.println("Time (sec) | Peak Vol | Volume Level    | Speech Prob | Speech Detected");
+                System.out.println("---------------------------------------------------------------------");
 
                 float threshold = 0.5f;
                 int printInterval = 5; // Print every 5 frames (~160ms) to avoid spamming
@@ -106,10 +134,12 @@ public class VADDemo {
                     System.arraycopy(samples, f * step, frame, 0, frameSize);
                     
                     float prob = vad.detectSpeech(frame, 16000);
+                    float peak = FastAudioProcess.getFramePeak(frame);
+                    String bar = FastAudioProcess.getAsciiVolumeBar(peak, 15);
                     
                     if (f % printInterval == 0) {
                         double timeSec = (double) (f * step) / 16000.0;
-                        System.out.printf("   %5.2fs   |        %5.2f       |      %b\n", timeSec, prob, (prob > threshold));
+                        System.out.printf("   %5.2fs   |   %4.2f   | %s |    %5.2f    |      %b\n", timeSec, peak, bar, prob, (prob > threshold));
                     }
                 }
             }
