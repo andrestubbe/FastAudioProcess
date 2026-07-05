@@ -517,20 +517,4 @@ public final class FastAudioProcess {
         return max;
     }
 
-    /**
-     * Helper to generate a text-based ASCII visual volume meter for console diagnostics.
-     */
-    public static String getAsciiVolumeBar(float peak, int width) {
-        if (width <= 0) return "";
-        int numChars = Math.round(Math.max(0.0f, Math.min(1.0f, peak)) * width);
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < width; i++) {
-            if (i < numChars) {
-                sb.append("=");
-            } else {
-                sb.append("-");
-            }
-        }
-        return sb.toString();
-    }
 }

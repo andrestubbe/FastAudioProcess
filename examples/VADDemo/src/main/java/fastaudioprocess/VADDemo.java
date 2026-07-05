@@ -135,7 +135,7 @@ public class VADDemo {
                     
                     float prob = vad.detectSpeech(frame, 16000);
                     float peak = FastAudioProcess.getFramePeak(frame);
-                    String bar = FastAudioProcess.getAsciiVolumeBar(peak, 15);
+                    String bar = getAsciiVolumeBar(peak, 15);
                     
                     if (f % printInterval == 0) {
                         double timeSec = (double) (f * step) / 16000.0;
@@ -190,5 +190,19 @@ public class VADDemo {
             samples[i] = sum / channels;
         }
         return samples;
+    }
+
+    private static String getAsciiVolumeBar(float peak, int width) {
+        if (width <= 0) return "";
+        int numChars = Math.round(Math.max(0.0f, Math.min(1.0f, peak)) * width);
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < width; i++) {
+            if (i < numChars) {
+                sb.append("=");
+            } else {
+                sb.append("-");
+            }
+        }
+        return sb.toString();
     }
 }
