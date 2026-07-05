@@ -83,10 +83,13 @@
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.1.0</version>
                 <configuration>
-                    <mainClass>fastaudioprocess.VADDemo</mainClass>
+                    <executable>java</executable>
                     <arguments>
                         <argument>--add-modules</argument>
                         <argument>jdk.incubator.vector</argument>
+                        <argument>-classpath</argument>
+                        <classpath/>
+                        <argument>fastaudioprocess.VADDemo</argument>
                     </arguments>
                 </configuration>
             </plugin>

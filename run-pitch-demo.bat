@@ -26,7 +26,7 @@ if %ERRORLEVEL% NEQ 0 (
 :: 3. Run the Demo
 echo.
 echo [3/3] Running PitchDemo...
-call mvn exec:exec -Dexec.executable="java" -Dexec.args="--add-modules jdk.incubator.vector -classpath %%classpath fastaudioprocess.PitchDemo"
+call mvn exec:exec
 
 cd ..\..
 echo.

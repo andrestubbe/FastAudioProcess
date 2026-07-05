@@ -76,10 +76,13 @@
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.1.0</version>
                 <configuration>
-                    <mainClass>fastaudioprocess.PitchDemo</mainClass>
+                    <executable>java</executable>
                     <arguments>
                         <argument>--add-modules</argument>
                         <argument>jdk.incubator.vector</argument>
+                        <argument>-classpath</argument>
+                        <classpath/>
+                        <argument>fastaudioprocess.PitchDemo</argument>
                     </arguments>
                 </configuration>
             </plugin>
