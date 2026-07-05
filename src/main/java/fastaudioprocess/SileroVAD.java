@@ -16,7 +16,7 @@ public final class SileroVAD implements AutoCloseable {
     private final OrtSession session;
     
     // LSTM state: shape [2, 1, 128]
-    private float[] state = new float[2 * 1 * 128];
+    private float[][][] state = new float[2][1][128];
 
     public SileroVAD(String modelPath) throws Exception {
         if (!new File(modelPath).exists()) {
@@ -36,7 +36,7 @@ public final class SileroVAD implements AutoCloseable {
      * Resets the recurrent LSTM state (called e.g. at the start of a new audio stream).
      */
     public synchronized void reset() {
-        state = new float[2 * 1 * 128];
+        state = new float[2][1][128];
     }
 
     /**
@@ -59,8 +59,7 @@ public final class SileroVAD implements AutoCloseable {
 
         OnnxTensor srTensor = OnnxTensor.createTensor(env, (long) sampleRate);
 
-        long[] stateShape = { 2, 1, 128 };
-        OnnxTensor stateTensor = OnnxTensor.createTensor(env, FloatBuffer.wrap(state), stateShape);
+        OnnxTensor stateTensor = OnnxTensor.createTensor(env, state);
 
         // Feed to session
         Map<String, OnnxTensor> inputs = new HashMap<>();
@@ -75,25 +74,13 @@ public final class SileroVAD implements AutoCloseable {
             float speechProb = outputVal[0][0];
 
             // output 1 is new state [2, 1, 128]
-            float[][][] newState = (float[][][]) result.get(1).getValue();
-            flattenState(newState, state);
+            state = (float[][][]) result.get(1).getValue();
 
             return speechProb;
         } finally {
             inputTensor.close();
             srTensor.close();
             stateTensor.close();
-        }
-    }
-
-    private void flattenState(float[][][] src, float[] dest) {
-        int idx = 0;
-        for (int i = 0; i < 2; i++) {
-            for (int j = 0; j < 1; j++) {
-                for (int k = 0; k < 128; k++) {
-                    dest[idx++] = src[i][j][k];
-                }
-            }
         }
     }
 
