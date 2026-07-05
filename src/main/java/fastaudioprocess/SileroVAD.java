@@ -53,8 +53,7 @@ public final class SileroVAD implements AutoCloseable {
         long[] inputShape = { 1, 512 };
         OnnxTensor inputTensor = OnnxTensor.createTensor(env, FloatBuffer.wrap(samples), inputShape);
 
-        long[] srShape = { 1 };
-        OnnxTensor srTensor = OnnxTensor.createTensor(env, LongBuffer.wrap(new long[] { sampleRate }), srShape);
+        OnnxTensor srTensor = OnnxTensor.createTensor(env, (long) sampleRate);
 
         long[] stateShape = { 2, 1, 128 };
         OnnxTensor stateTensor = OnnxTensor.createTensor(env, FloatBuffer.wrap(state), stateShape);
