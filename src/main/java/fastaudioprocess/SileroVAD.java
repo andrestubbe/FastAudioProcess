@@ -24,8 +24,12 @@ public final class SileroVAD implements AutoCloseable {
         }
         this.env = OrtEnvironment.getEnvironment();
         this.session = env.createSession(modelPath, new OrtSession.SessionOptions());
-        System.out.println("[VAD DEBUG] Model Inputs: " + this.session.getInputNames());
-        System.out.println("[VAD DEBUG] Model Outputs: " + this.session.getOutputNames());
+        for (Map.Entry<String, NodeInfo> entry : session.getInputInfo().entrySet()) {
+            System.out.println("[VAD DEBUG] Input: " + entry.getKey() + " | Info: " + entry.getValue().getInfo().toString());
+        }
+        for (Map.Entry<String, NodeInfo> entry : session.getOutputInfo().entrySet()) {
+            System.out.println("[VAD DEBUG] Output: " + entry.getKey() + " | Info: " + entry.getValue().getInfo().toString());
+        }
     }
 
     /**
