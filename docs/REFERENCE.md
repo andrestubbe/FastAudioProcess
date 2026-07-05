@@ -36,13 +36,11 @@
 *   `detectPitchNative(float[] samples, int sampleRate)`: Uses JNI autocorrelation mapping to estimate the fundamental frequency. Returns float pitch in Hz, or `0.0f` if unvoiced.
 *   `pitchShiftNative(float[] samples, float semitones, int sampleRate)`: Modifies pitch in-place using a zero-copy time-domain Overlap-Add algorithm in native C++, preserving duration.
 
-### 4.2 Local AI VAD (ONNX)
-*   `SileroVAD(String modelPath)`: Stateful recurrent LSTM wrapper.
-*   `detectSpeech(float[] samples, int sampleRate)`: Accepts exactly 512 samples (16kHz), internally updates recurrent state `[2, 1, 128]`, and outputs speech probability `[0.0, 1.0]`.
-
-### 4.3 Java DSP & Chunker
+### 4.2 Java DSP & Waveform Helpers
 *   `logMelSpectrogram(float[] samples, ...)`: Computes linear FFT bins and maps them onto log Mel-scale spectrogram bands.
 *   `FrameChunker`: Overlapping sliding-window chunker for stream block segmentation.
+*   `generateWaveformPoints(float[] samples, int targetPoints)`: Mathematical downsampling of audio signals to a fixed number of peak values for visualization/drawing.
+*   `getFramePeak(float[] samples)`: Calculates the maximum absolute peak value of a single audio frame (useful for real-time stream level meters).
 
 ---
 

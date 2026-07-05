@@ -9,11 +9,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 - Native JNI Autocorrelation-based Pitch Detection (`detectPitchNative`)
 - Native JNI Overlap-Add Pitch Shifting (`pitchShiftNative`) preserving speed/duration
-- Local stateful Silero VAD v5 ONNX model runner (`SileroVAD`)
+- Waveform downsampling (`generateWaveformPoints`) and absolute peak tracking (`getFramePeak`) helpers
 - Sliding-window frame segmentation chunker (`FrameChunker`)
 - Crossover 3-band Equalizer and Noise Gate FX filters
 - Log-Mel Spectrogram extraction and pre-emphasis filtering
-- PitchDemo and VADDemo under `examples/` with automated root runner batch scripts
+- PitchDemo under `examples/` with automated root runner batch script
 
 ## [0.1.0] - 2026-07-04
 

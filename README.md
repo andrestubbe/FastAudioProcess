@@ -46,11 +46,11 @@ public class Demo {
 ## Key Features
 
 * **🚀 SIMD Vector API Acceleration** — High-performance computations like RMS and multi-channel mixing accelerated via JDK 17 Vector API.
-* **🎙️ Voice Activity Detection & Speech ML** — Stateful Silero VAD (v5 ONNX) integration for recurrent speech-probability tracking, frame energy estimation, and Log-Mel Spectrogram extraction.
+* **📊 Waveform Visualization & Metering** — Direct mathematical signal downsampling (`generateWaveformPoints`) for full-timeline waveform drawing and dynamic absolute peak tracking (`getFramePeak`) for real-time streams (like capture/playback).
 * **🎵 Pitch Processing & DSP** — Zero-copy JNI Autocorrelation-based Pitch Detection and time-domain Overlap-Add Pitch Shifting (speed-preserved) in C++.
 * **🎛️ Audio FX & Streaming** — Sliding-window frame chunking, 3-band Equalizer crossover filters, and Noise Gate processing.
 * **⚡ Resampling & Format Conversion** — Convert MP3s to WAV PCM or resample arbitrary WAV byte arrays to standard 44100Hz stereo/mono formats.
-* **📦 Zero Dependencies** — Main library is completely self-contained. (Demos/VAD utilize ONNX Runtime).
+* **📦 Zero Dependencies** — Main library is completely self-contained.
 
 ---
 
@@ -75,6 +75,8 @@ FastAudioProcess is designed to process audio signals at hardware-native speeds 
 | `detectPitchNative(float[], int)` | Evaluates fundamental voice pitch natively via autocorrelation. | [REFERENCE.md](docs/REFERENCE.md) |
 | `pitchShiftNative(float[], float, int)` | Shifts voice pitch in-place natively without changing speed. | [REFERENCE.md](docs/REFERENCE.md) |
 | `logMelSpectrogram(float[], int, int, int, int)` | Generates a Log-Mel Spectrogram representation of audio samples. | [REFERENCE.md](docs/REFERENCE.md) |
+| `generateWaveformPoints(float[], int)` | Downsamples audio to fixed size peak amplitudes for rendering. | [REFERENCE.md](docs/REFERENCE.md) |
+| `getFramePeak(float[])` | Calculates the maximum absolute peak value of a single audio block. | [REFERENCE.md](docs/REFERENCE.md) |
 
 > [!TIP]
 > See **[REFERENCE.md](docs/REFERENCE.md)** for full JNI contracts, fallback rules, and specifications.
@@ -122,7 +124,7 @@ dependencies {
 
 * **[REFERENCE.md](docs/REFERENCE.md)**: Full technical specification and JNI contracts.
 * **[PHILOSOPHY.md](docs/PHILOSOPHY.md)**: The "Native-First" philosophy.
-* **[ROADMAP.md](docs/ROADMAP.md)**: Future development, including wake-word VAD helper routines.
+* **[ROADMAP.md](docs/ROADMAP.md)**: Future development.
 * **[CHANGELOG.md](docs/CHANGELOG.md)**: Project history.
 * **[COMPILE.md](docs/COMPILE.md)**: Compilation guide.
 
