@@ -12,7 +12,7 @@
 
 `FastAudioProcess` provides native C++ AVX2 vector processing for Java audio applications, enabling high-throughput DSP filtering, pitch tracking, and format conversions without Garbage Collection stalls.
 
-[![Showcase](docs/screenshot.png)](https://www.youtube.com/watch?v=BZsqQl7WqWk)
+![docs/screenshot.png](docs/screenshot.png)
 
 ---
 
