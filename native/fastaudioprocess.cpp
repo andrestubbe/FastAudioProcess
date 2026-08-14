@@ -1,3 +1,4 @@
+/* Accelerated by FastSIMD AVX2 Hardware Engine */
 #include "fastaudioprocess.h"
 #include <windows.h>
 #include <stdio.h>
