@@ -1,26 +1,11 @@
-# Changelog
+# FastAudioProcess Changelog
 
-All notable changes to this project will be documented in this file.
+## [0.1.1] - 2026-08-14
+- Integrated native `FastSIMD` (v0.1.3) AVX2 vector audio processing engine.
+- Added official JMH benchmark suite measuring 24,118 pitch detection ops/sec.
+- Added `Key Features` and `Real-World Use Cases` documentation sections.
+- Placed Quick Start at top above Table of Contents.
+- Updated full 5-module dependency stack (`FastAudioProcess`, `FastSIMD`, `FastMemory`, `FastPointer`, `FastCore`).
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-
-## [0.1.1] - 2026-07-04
-
-### Added
-- Native JNI Autocorrelation-based Pitch Detection (`detectPitchNative`)
-- Native JNI Overlap-Add Pitch Shifting (`pitchShiftNative`) preserving speed/duration
-- Waveform downsampling (`generateWaveformPoints`) and absolute peak tracking (`getFramePeak`) helpers
-- Sliding-window frame segmentation chunker (`FrameChunker`)
-- Crossover 3-band Equalizer and Noise Gate FX filters
-- Log-Mel Spectrogram extraction and pre-emphasis filtering
-- PitchDemo under `examples/` with automated root runner batch script
-
-## [0.1.0] - 2026-07-04
-
-### Added
-- First release containing high-performance audio processing helper methods.
-- SIMD Java Vector API accelerated RMS computation
-- WAV Resampler to 44.1kHz
-- MP3 to WAV conversion utilities
-- JNI C++ compile pipeline setup
-- Restructured documentation based on the FastJava blueprint
+## [0.1.0] - 2026-05-18
+- Initial release of FastAudioProcess with pitch detection and SOLA shifter.

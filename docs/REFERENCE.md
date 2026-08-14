@@ -1,57 +1,21 @@
-# FastAudioProcess Reference Specification
+# FastAudioProcess API Reference Manual
+
+`FastAudioProcess` provides high-performance native audio DSP, SIMD-accelerated pitch detection, and SOLA pitch shifting.
 
 ---
 
-**Detailed JNI contracts, fallbacks, and execution rules for FastAudioProcess.**
+## 1. Native Audio API
+
+### `detectPitchNative`
+```java
+public static native float detectPitchNative(float[] samples, int sampleRate)
+```
+Estimates fundamental frequency (F0) using AVX2 SIMD autocorrelation.
 
 ---
 
-## 1. CPU & SIMD Feature Model
-
-*   **⚡ JDK Vector API (SIMD)** — Used for high-performance JVM-level vectorization (e.g., RMS calculation, normalize, mixChannels).
-*   **🚀 AVX2 / SSE4.2** — detected via CPUID for native routines. Enables 32-byte and 16-byte vector ops.
-*   **🔄 Fallback rule**: JDK Vector API / Native AVX2 → SSE4.2 → scalar.
-
----
-
-## 2. Guarantees
-
-*   **🚫 Zero-Copy** — All operations use direct memory pinning (`GetPrimitiveArrayCritical`) or direct buffers for zero copy between Java and native layers.
-*   **📏 Unaligned Access** — Safe on all byte boundaries.
-*   **🔒 Thread-Safety** — All static native and Java processing methods are thread-safe.
-
----
-
-## 3. JNI & Memory Contracts
-
-*   **⚡ Direct Memory Pinning** — No implicit copies are made by the JNI bridge.
-*   **📦 No Allocation** — All operations work on pre-allocated Java arrays or buffers.
-*   **⏰ Critical Sections** — Native calls minimize blocking to prevent GC impact.
-
----
-
-## 4. API Reference Details
-
-### 4.1 Native JNI Methods
-*   `detectPitchNative(float[] samples, int sampleRate)`: Uses JNI autocorrelation mapping to estimate the fundamental frequency. Returns float pitch in Hz, or `0.0f` if unvoiced.
-*   `pitchShiftNative(float[] samples, float semitones, int sampleRate)`: Modifies pitch in-place using a zero-copy time-domain Overlap-Add algorithm in native C++, preserving duration.
-
-### 4.2 Java DSP & Waveform Helpers
-*   `logMelSpectrogram(float[] samples, ...)`: Computes linear FFT bins and maps them onto log Mel-scale spectrogram bands.
-*   `FrameChunker`: Overlapping sliding-window chunker for stream block segmentation.
-*   `generateWaveformPoints(float[] samples, int targetPoints)`: Mathematical downsampling of audio signals to a fixed number of peak values for visualization/drawing.
-*   `getFramePeak(float[] samples)`: Calculates the maximum absolute peak value of a single audio frame (useful for real-time stream level meters).
-
----
-
-## 5. Platform Support
-
-| Platform | Status |
-|----------|--------|
-| Windows 10/11 (x64) | ✅ Fully Supported |
-
----
-
-**Part of the FastJava Ecosystem** — *Making the JVM faster.*
-
-Made with ⚡ by Andre Stubbe
+### `pitchShiftNative`
+```java
+public static native void pitchShiftNative(float[] samples, float semitones, int sampleRate)
+```
+Applies Synchronized Overlap-Add (SOLA) pitch shifting without modifying playback speed.

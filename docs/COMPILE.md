@@ -1,51 +1,13 @@
-# Building FastAudioProcess from Source
+# FastAudioProcess Compilation Guide
 
-## Prerequisites
+## Native C++ MSVC AVX2 Build Chain
 
-- **JDK 17+** — [Download](https://adoptium.net/)
-- **Maven 3.9+** — [Download](https://maven.apache.org/download.cgi)
-- **Visual Studio 2022** — Community/Professional/Enterprise/BuildTools
+1. Requirements: Visual Studio 2022 / 2026 with "Desktop development with C++" and JDK 17+.
+2. Open Developer Command Prompt or PowerShell in the repository root.
+3. Run the automated native compilation script:
 
-## Quick Build
-
-```bash
-# 1. Build native DLL first (Windows)
+```cmd
 compile.bat
-
-# 2. Build JAR
-mvn clean package -DskipTests
 ```
 
-## Build Commands
-
-| Command | Purpose |
-|---------|---------|
-| `compile.bat` | Build native DLL (Windows) |
-| `mvn clean compile` | Compile Java only |
-| `mvn clean package` | Build FatJAR with DLL embedded |
-| `mvn test` | Run unit tests |
-
-## Native DLL Build
-
-The `compile.bat` script:
-- Auto-detects Visual Studio 2019/2022
-- Auto-detects JAVA_HOME
-- Uses `native\fastaudioprocess.def` for JNI exports
-- Outputs to `build\fastaudioprocess.dll`
-
-The Maven `pom.xml` will automatically pick up `build\fastaudioprocess.dll` and bundle it inside the JAR.
-
-## JNI Exports (.def File)
-
-When using JNI, you MUST export your native functions in the `native\fastaudioprocess.def` file:
-
-```def
-LIBRARY fastaudioprocess
-EXPORTS
-    Java_fastaudioprocess_FastAudioProcess_doSomethingNative
-```
-
-**Important:** Function names must match Java's expected format:
-- Pattern: `Java_packagename_Classname_methodname`
-
-Without the `.def` file, JNI methods won't be exported and you'll get `UnsatisfiedLinkError`.
+This compiles `fastaudioprocess.dll` with MSVC AVX2 flags (`/arch:AVX2 /O2 /D_CRT_SECURE_NO_WARNINGS`) and copies the output DLL to `src/main/resources/native/` and `src/main/resources/win32-x86-64/`.
