@@ -227,17 +227,43 @@ Download the latest JAR directly to add it to your classpath:
 
 ---
 
+---
+
+## Documentation
+
+- [COMPILE.md](docs/COMPILE.md): Full compilation guide (MSVC Native AVX2 & Maven Build Setup).
+- [REFERENCE.md](docs/REFERENCE.md): Exhaustive catalog of DSP algorithms, FFT kernels, and acoustics architecture.
+- [PHILOSOPHY.md](docs/PHILOSOPHY.md): Zero-allocation, native-first, and low-overhead real-time DSP design principles.
+- [ROADMAP.md](docs/ROADMAP.md): Planned milestone features, ARM NEON SIMD, and GPU compute extensions.
+- [CHANGELOG.md](docs/CHANGELOG.md): Complete chronological record of version releases and performance improvements.
+
+---
+
 ## Platform Support
 
-| Operating System | Architecture | Supported | Vector ISA |
-|------------------|--------------|-----------|------------|
-| Windows 10 / 11 | x64 (AMD64) | ✅ | AVX2 / FMA3 |
-| Windows Server 2019+ | x64 | ✅ | AVX2 |
-| Linux (Ubuntu/Debian) | x64 / ARM64 | 🟡 Planned | AVX2 / NEON |
-| macOS (Apple Silicon) | ARM64 | 🟡 Planned | NEON |
+| Platform | Architecture | Status | Vector ISA |
+|----------|--------------|--------|------------|
+| Windows 10 / 11 | x64 (AMD64) | ✅ Fully Supported | AVX2 / FMA3 |
+| Windows Server 2019+ | x64 | ✅ Fully Supported | AVX2 |
+| Linux (Ubuntu/Debian) | x64 / ARM64 | 🚧 Planned | AVX2 / NEON |
+| macOS (Apple Silicon) | ARM64 | 🚧 Planned | NEON |
 
 ---
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+MIT License — See [LICENSE](LICENSE) for details.
+
+---
+
+## Related Projects
+
+- [FastVAD](https://github.com/andrestubbe/FastVAD) — Real-time Voice Activity Detection with sub-10ms latency
+- [FastAudioCapture](https://github.com/andrestubbe/FastAudioCapture) — Zero-copy WASAPI audio loopback & microphone capture
+- [FastSIMD](https://github.com/andrestubbe/FastSIMD) — Hardware SIMD vectorization primitives
+- [FastCore](https://github.com/andrestubbe/FastCore) — Native JNI Loader and Utilities
+- [FastExecution](https://github.com/andrestubbe/FastExecution) — High-precision audio scheduling engine
+
+---
+
+*Part of the FastJava Ecosystem — Making the JVM faster. Small package. Maximum speed. Zero bloat. 🚀*
