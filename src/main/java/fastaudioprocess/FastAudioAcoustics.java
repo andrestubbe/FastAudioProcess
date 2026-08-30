@@ -75,18 +75,23 @@ public final class FastAudioAcoustics {
         for (int lag = minLag; lag <= maxL; lag++) {
             double sumLag = 0.0;
             double sumBase = 0.0;
+            double sumShift = 0.0;
             for (int i = 0; i < n - lag; i++) {
-                sumLag += (samples[i] * samples[i + lag]);
-                sumBase += (samples[i] * samples[i]);
+                float s0 = samples[i];
+                float sL = samples[i + lag];
+                sumLag += (s0 * sL);
+                sumBase += (s0 * s0);
+                sumShift += (sL * sL);
             }
-            if (sumBase > 1e-6) {
-                double norm = sumLag / sumBase;
+            double energy = Math.sqrt(sumBase * sumShift);
+            if (energy > 1e-6) {
+                double norm = sumLag / energy;
                 if (norm > maxNormAutocorr) {
                     maxNormAutocorr = norm;
                 }
             }
         }
-        return (float) maxNormAutocorr;
+        return (float) Math.min(1.0, Math.max(0.0, maxNormAutocorr));
     }
 
     /**
