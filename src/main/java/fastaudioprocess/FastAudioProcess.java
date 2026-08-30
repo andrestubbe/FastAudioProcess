@@ -1,5 +1,7 @@
 package fastaudioprocess;
 
+import fastcore.FastCore;
+
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -9,62 +11,65 @@ import jdk.incubator.vector.ShortVector;
 import jdk.incubator.vector.VectorSpecies;
 
 /**
- * FastAudioProcess - High-performance audio processing, format conversions, and resampling.
+ * High-performance hardware SIMD-accelerated audio processing, spectral filtering, and DSP engine for Java.
+ * <p>
+ * Provides native AVX2 pitch detection (autocorrelation), time-domain SOLA pitch shifting,
+ * real-time spectral power noise suppression, dynamic noise gating, and zero-allocation acoustic analysis
+ * (Crest Factor, Zero-Crossing Rate, Harmonic Periodicity) without JVM Garbage Collection stalls.
+ * </p>
  */
 public final class FastAudioProcess {
 
-    private static final String LIBRARY_NAME = "fastaudioprocess";
+    private static final boolean NATIVE_LOADED;
 
     static {
-        loadNativeLibrary();
-    }
-
-    private static void loadNativeLibrary() {
+        boolean loaded = false;
         try {
-            System.loadLibrary(LIBRARY_NAME);
-        } catch (UnsatisfiedLinkError e) {
-            try {
-                String libResource = "/native/" + LIBRARY_NAME + ".dll";
-                try (InputStream in = FastAudioProcess.class.getResourceAsStream(libResource)) {
-                    if (in == null) {
-                        libResource = "/" + LIBRARY_NAME + ".dll";
-                        try (InputStream in2 = FastAudioProcess.class.getResourceAsStream(libResource)) {
-                            if (in2 != null) {
-                                loadFromStream(in2);
-                            }
-                        }
-                    } else {
-                        loadFromStream(in);
-                    }
-                }
-            } catch (Exception ex) {
-                System.err.println("Note: Native fastaudioprocess library could not be loaded: " + ex.getMessage());
-            }
+            FastCore.loadLibrary("fastaudioprocess", FastAudioProcess.class);
+            loaded = true;
+        } catch (Throwable t) {
+            loaded = false;
         }
+        NATIVE_LOADED = loaded;
     }
 
-    private static void loadFromStream(InputStream in) throws Exception {
-        Path tempDir = Files.createTempDirectory("fastaudioprocess");
-        Path tempLib = tempDir.resolve("fastaudioprocess.dll");
-        Files.copy(in, tempLib, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-        tempLib.toFile().deleteOnExit();
-        tempDir.toFile().deleteOnExit();
-        System.load(tempLib.toString());
+    private FastAudioProcess() {
     }
 
     /**
-     * Estimates the fundamental frequency (pitch) of voice samples using native autocorrelation.
+     * Returns true if the native C++ AVX2 hardware acceleration DLL is active.
+     *
+     * @return true if native acceleration is loaded, false otherwise
+     */
+    public static boolean isNativeLoaded() {
+        return NATIVE_LOADED;
+    }
+
+    /**
+     * Estimates the fundamental frequency (pitch F0 in Hz) of voice samples using native SIMD autocorrelation.
+     *
+     * @param samples    raw audio samples (normalized float array in [-1.0, 1.0])
+     * @param sampleRate audio sampling rate in Hz (e.g. 16000 or 44100)
+     * @return estimated pitch in Hertz (Hz), or 0.0 if unvoiced/silent
      */
     public static native float detectPitchNative(float[] samples, int sampleRate);
 
     /**
-     * Shifts the pitch of the samples by the specified semitones natively without changing the speed/duration (using SOLA).
+     * Shifts the pitch of audio samples by the specified semitones natively using the SOLA
+     * (Synchronized Overlap-Add) algorithm without altering playback speed or duration.
+     *
+     * @param samples    audio samples to shift (modified in-place)
+     * @param semitones  pitch shift amount in musical semitones (e.g. +2.0 for higher, -2.0 for lower)
+     * @param sampleRate audio sampling rate in Hz (e.g. 44100)
      */
     public static native void pitchShiftNative(float[] samples, float semitones, int sampleRate);
 
-
     /**
-     * Converts a standard MP3 file to 44100Hz Stereo 16-bit WAV PCM format.
+     * Converts a standard MP3 audio file into a 44100Hz Stereo 16-bit signed WAV PCM file.
+     *
+     * @param mp3File input MP3 file on disk
+     * @return temporary WAV file containing decoded PCM audio
+     * @throws Exception if audio decoding fails or file is invalid
      */
     public static File mp3ToWav(File mp3File) throws Exception {
         if (!mp3File.exists()) {
@@ -97,7 +102,11 @@ public final class FastAudioProcess {
     }
 
     /**
-     * Resamples any arbitrary WAV byte array (like Piper outputs) to 44100Hz Stereo 16-bit WAV.
+     * Resamples arbitrary WAV byte data (e.g. from Piper TTS) to 44100Hz Stereo 16-bit WAV PCM.
+     *
+     * @param wavData raw byte array of source WAV audio
+     * @return resampled 44.1kHz Stereo WAV byte array
+     * @throws Exception if conversion or resampling fails
      */
     public static byte[] resampleWavTo44100(byte[] wavData) throws Exception {
         if (wavData == null || wavData.length < 44) return wavData;
@@ -118,7 +127,6 @@ public final class FastAudioProcess {
                     false
             );
 
-            // Compute target frame length: (sourceFrameLength * targetSampleRate) / sourceSampleRate
             long srcFrameLength = sourceStream.getFrameLength();
             long targetFrameLength = (long) ((srcFrameLength * 44100.0f) / sourceFormat.getSampleRate());
 
@@ -156,13 +164,25 @@ public final class FastAudioProcess {
     private static final VectorSpecies<Float> SPECIES = jdk.incubator.vector.FloatVector.SPECIES_PREFERRED;
     private static final ThreadLocal<float[]> THREAD_LOCAL_BUFFER = ThreadLocal.withInitial(() -> new float[16384]);
 
+    /**
+     * Computes Root Mean Square (RMS) energy level of a byte buffer.
+     *
+     * @param buffer    raw 16-bit PCM bytes
+     * @param bytesRead total valid bytes in buffer
+     * @return normalized RMS volume level in range [0.0, 1.0]
+     */
     public static float computeRms(byte[] buffer, int bytesRead) {
         return computeRms(buffer, 0, bytesRead);
     }
 
     /**
-     * Computes the Root Mean Square (RMS) volume level of a PCM audio buffer from offset.
-     * Accelerated using the Java 17 Vector API (SIMD).
+     * Computes Root Mean Square (RMS) volume level of a PCM audio buffer from offset.
+     * Accelerated using Java 17 Vector API (SIMD).
+     *
+     * @param buffer raw 16-bit PCM bytes
+     * @param offset starting byte offset
+     * @param length byte length to process
+     * @return normalized RMS volume level in range [0.0, 1.0]
      */
     public static float computeRms(byte[] buffer, int offset, int length) {
         int count = length / 2;
@@ -204,6 +224,9 @@ public final class FastAudioProcess {
     /**
      * Applies a high-pass pre-emphasis filter to the audio samples in-place.
      * Formula: y[n] = x[n] - factor * x[n-1]
+     *
+     * @param samples audio buffer (modified in-place)
+     * @param factor  pre-emphasis coefficient (typically 0.95 - 0.97)
      */
     public static void preEmphasis(float[] samples, float factor) {
         if (samples == null || samples.length <= 1) return;
@@ -213,14 +236,16 @@ public final class FastAudioProcess {
     }
 
     /**
-     * Normalizes the amplitude of the audio samples in-place so that the peak reaches targetPeak.
-     * Accelerated using the Java 17 Vector API (SIMD).
+     * Normalizes amplitude of audio samples in-place so peak reaches targetPeak.
+     * Accelerated using Java 17 Vector API (SIMD).
+     *
+     * @param samples    audio buffer (modified in-place)
+     * @param targetPeak target absolute peak value (e.g. 0.95f)
      */
     public static void normalize(float[] samples, float targetPeak) {
         if (samples == null || samples.length == 0 || targetPeak <= 0) return;
         int len = samples.length;
 
-        // Find absolute maximum peak
         float maxVal = 0.0f;
         int i = 0;
         int limit = len - (len % SPECIES.length());
@@ -241,7 +266,6 @@ public final class FastAudioProcess {
 
         if (maxVal == 0.0f) return;
 
-        // Scale elements using Vector multiplication
         float scale = targetPeak / maxVal;
         jdk.incubator.vector.FloatVector scaleVector = jdk.incubator.vector.FloatVector.broadcast(SPECIES, scale);
 
@@ -256,7 +280,12 @@ public final class FastAudioProcess {
     }
 
     /**
-     * Computes the average frame energy for Voice Activity Detection (VAD).
+     * Computes average frame energy for Voice Activity Detection.
+     *
+     * @param samples 16-bit PCM short array
+     * @param offset  start index
+     * @param length  number of samples
+     * @return normalized mean square energy in [0.0, 1.0]
      */
     public static float computeFrameEnergy(short[] samples, int offset, int length) {
         if (samples == null || length <= 0) return 0.0f;
@@ -269,8 +298,15 @@ public final class FastAudioProcess {
     }
 
     /**
-     * Generates a Log-Mel Spectrogram representation of the audio samples.
+     * Generates a Log-Mel Spectrogram representation of audio samples.
      * Maps linear FFT frequency bins onto Mel-frequency scale bins.
+     *
+     * @param samples    raw float audio samples
+     * @param sampleRate sample rate in Hz
+     * @param fftSize    window FFT size (e.g. 512)
+     * @param hopSize    step size between windows (e.g. 160)
+     * @param melBins    number of Mel frequency filter banks (e.g. 80)
+     * @return 2D array of [numFrames][melBins] log-mel energies
      */
     public static float[][] logMelSpectrogram(float[] samples, int sampleRate, int fftSize, int hopSize, int melBins) {
         int len = samples.length;
@@ -279,13 +315,11 @@ public final class FastAudioProcess {
 
         float[][] melSpec = new float[numFrames][melBins];
 
-        // Compute Hann window
         float[] window = new float[fftSize];
         for (int i = 0; i < fftSize; i++) {
             window[i] = (float) (0.5 * (1.0 - Math.cos(2.0 * Math.PI * i / (fftSize - 1))));
         }
 
-        // DFT and Mel filtering
         for (int f = 0; f < numFrames; f++) {
             int startIdx = f * hopSize;
             float[] frame = new float[fftSize];
@@ -330,8 +364,11 @@ public final class FastAudioProcess {
     }
 
     /**
-     * Resamples the audio samples to shift the pitch by the specified semitones.
-     * Positive semitones speed up and raise pitch, negative slow down and lower pitch.
+     * Resamples audio samples linearly to shift pitch by specified semitones.
+     *
+     * @param samples   input audio samples
+     * @param semitones semitones shift (+/-)
+     * @return resampled audio array
      */
     public static float[] pitchShiftResample(float[] samples, float semitones) {
         if (samples == null || samples.length == 0 || semitones == 0.0f) return samples;
@@ -352,8 +389,11 @@ public final class FastAudioProcess {
     }
 
     /**
-     * Mixes multiple audio channels using weights.
-     * Accelerated using the Java 17 Vector API (SIMD).
+     * Mixes multiple audio channels using weights via SIMD vector acceleration.
+     *
+     * @param channels 2D array of [numChannels][sampleCount]
+     * @param weights  mixing weight factors per channel
+     * @return blended audio array
      */
     public static float[] mixChannels(float[][] channels, float[] weights) {
         if (channels == null || channels.length == 0) return new float[0];
@@ -413,7 +453,6 @@ public final class FastAudioProcess {
                 if (count < buffer.length) {
                     count++;
                 } else {
-                    // Buffer overrun, drop oldest samples
                     readIndex = (readIndex + 1) % buffer.length;
                 }
             }
@@ -438,7 +477,11 @@ public final class FastAudioProcess {
     }
 
     /**
-     * Block-based Noise Gate to attenuate signals below the threshold.
+     * Applies a block-based dynamic downward expander / noise gate in-place.
+     *
+     * @param samples     audio buffer (modified in-place)
+     * @param thresholdDb threshold in decibels
+     * @param reductionDb attenuation reduction in decibels below threshold
      */
     public static void applyNoiseGate(float[] samples, float thresholdDb, float reductionDb) {
         if (samples == null || samples.length == 0) return;
@@ -461,6 +504,11 @@ public final class FastAudioProcess {
 
     /**
      * Real-time 3-band Equalizer utilizing Low-pass and High-pass crossover filters.
+     *
+     * @param samples      audio buffer (modified in-place)
+     * @param bassGainDb   bass band gain in dB
+     * @param midGainDb    midrange band gain in dB
+     * @param trebleGainDb treble band gain in dB
      */
     public static void apply3BandEqualizer(float[] samples, float bassGainDb, float midGainDb, float trebleGainDb) {
         if (samples == null || samples.length == 0) return;
@@ -470,14 +518,14 @@ public final class FastAudioProcess {
 
         float lp = 0.0f;
         float hp = 0.0f;
-        float alphaL = 0.15f;
-        float alphaH = 0.75f;
+        float alphaL = 0.15f; 
+        float alphaH = 0.75f; 
 
         for (int i = 0; i < samples.length; i++) {
             float input = samples[i];
             lp = lp + alphaL * (input - lp);
             float bass = lp;
-            hp = alphaH * (hp + input - (i > 0 ? samples[i - 1] : input));
+            hp = alphaH * (hp + input - (i > 0 ? samples[i-1] : input));
             float treble = hp;
             float mid = input - bass - treble;
             samples[i] = bass * bassGain + mid * midGain + treble * trebleGain;
@@ -487,6 +535,10 @@ public final class FastAudioProcess {
     /**
      * Downsamples a large array of float samples into exactly targetPoints peak values
      * (the absolute maximum in each segment) for rendering / timeline visualization.
+     *
+     * @param samples      audio samples array
+     * @param targetPoints number of waveform visualization points to return
+     * @return array of peak points
      */
     public static float[] generateWaveformPoints(float[] samples, int targetPoints) {
         if (samples == null || samples.length == 0 || targetPoints <= 0) {
@@ -510,6 +562,9 @@ public final class FastAudioProcess {
 
     /**
      * Returns the maximum absolute peak value of a single audio frame.
+     *
+     * @param samples audio frame samples
+     * @return peak absolute value in range [0.0, 1.0+]
      */
     public static float getFramePeak(float[] samples) {
         if (samples == null || samples.length == 0) return 0.0f;
@@ -525,10 +580,10 @@ public final class FastAudioProcess {
      * Suppresses stationary acoustic background noise (fans, hums, mic hiss) in-place
      * using spectral power subtraction and Wiener gain smoothing.
      *
-     * @param samples         raw audio frame samples (modified in-place)
-     * @param sampleRate      sample rate in Hz (e.g. 16000 or 44100)
-     * @param reductionFactor noise attenuation factor (e.g. 0.85f for gentle, 1.5f for aggressive)
-     * @param spectralFloor   minimum spectral gain floor to prevent musical noise artifacts (e.g. 0.02f)
+     * @param samples          raw audio frame samples (modified in-place)
+     * @param sampleRate       sample rate in Hz (e.g. 16000 or 44100)
+     * @param reductionFactor  noise attenuation factor (e.g. 0.85f for gentle, 1.5f for aggressive)
+     * @param spectralFloor    minimum spectral gain floor to prevent musical noise artifacts (e.g. 0.02f)
      */
     public static void suppressNoise(float[] samples, int sampleRate, float reductionFactor, float spectralFloor) {
         if (samples == null || samples.length < 32) return;
@@ -545,19 +600,19 @@ public final class FastAudioProcess {
         int half = n / 2 + 1;
         float[] real = new float[half];
         float[] imag = new float[half];
-        float[] mag = new float[half];
+        float[] mag  = new float[half];
 
         for (int k = 0; k < half; k++) {
             float r = 0.0f;
             float im = 0.0f;
             for (int t = 0; t < n; t++) {
                 double angle = 2.0 * Math.PI * k * t / n;
-                r += windowed[t] * (float) Math.cos(angle);
+                r  += windowed[t] * (float) Math.cos(angle);
                 im -= windowed[t] * (float) Math.sin(angle);
             }
             real[k] = r;
             imag[k] = im;
-            mag[k] = (float) Math.sqrt(r * r + im * im);
+            mag[k]  = (float) Math.sqrt(r * r + im * im);
         }
 
         // 3. Noise Profile Estimation (lowest 15% quantile spectral floor)
@@ -647,7 +702,7 @@ public final class FastAudioProcess {
         if (samples == null || samples.length <= minLag) return 0.0f;
         int n = samples.length;
         int maxL = Math.min(maxLag, n / 2);
-
+        
         double r0 = 0.0;
         for (float s : samples) r0 += (s * s);
         if (r0 < 1e-6) return 0.0f;
