@@ -1,25 +1,9 @@
-# The Philosophy of FastAudioProcess
+# FastAudioProcess Design Philosophy
 
-> [!IMPORTANT]
-> **"Keine Kopien. Niemals. Kritischer JNI-Pfad. Native-First Performance."**
+`FastAudioProcess` is built on the core engineering tenets of the **FastJava Ecosystem**:
 
----
-
-FastAudioProcess is built on the principle that modern Java applications require **native-first** acceleration for performance-critical operations that the standard JVM APIs don't fully optimize.
-
----
-
-## Core Tenets
-
-*   **⚡ Native-First Execution** — Bypass standard Java layers to reach the physical limits of the hardware using hand-tuned C++ and SIMD intrinsics.
-*   **🚫 Zero-Copy JNI Architecture** — Minimize JNI transition costs by using direct memory access patterns and avoiding implicit memory copies between the JVM and the native layer.
-*   **🌙 Deterministic Latency** — Eliminate variance caused by JIT warm-up or garbage collection stalls in critical hot-paths.
-*   **🚀 Hardware-Aware Optimization** — Leverage modern CPU features (AVX, SSE, NEON, Vector API) to process data at hardware-native speeds.
-*   **📦 Blueprint Consistency** — As part of the **FastJava** ecosystem, FastAudioProcess adheres to a standardized architecture:
-    *   **Native Backend**: Direct C++ implementation and JDK Vector API SIMD implementations.
-    *   **Unified Loading**: Powered by `FastCore`.
-    *   **Premium Quality**: Built for high-performance systems and autonomous agents.
-
----
-
-**⚡ FastAudioProcess — Powering the next generation of Native Java.**
+1. **Zero Runtime Garbage Collection**: Audio hotpaths must not allocate heap objects. All FFT scratch spaces, delay lines, and ring buffers use thread-local or preallocated memory.
+2. **Native-First Acceleration**: Where CPU SIMD vectorization provides orders of magnitude speedups (AVX2 pitch detection, FastFFT), C++ native substrates with JNI Critical Arrays (`GetPrimitiveArrayCritical`) are used.
+3. **Lock-Free Streaming**: Multi-threaded audio pipelines must not block on monitor locks. SPSC ringbuffers utilize atomic counters and power-of-two bitmasks.
+4. **Stateful Streaming Continuity**: Filter crossover memory (Equalizers, Overlap-Add) is preserved across chunk boundaries to eliminate audio crackles and phase discontinuities.
+5. **Standard Mathematical Precision**: Standard triangular Mel filterbanks, Hermitian symmetry preservation, and DC-removal ensure mathematical correctness for neural inference (VAD, STT).
