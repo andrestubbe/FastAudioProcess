@@ -113,14 +113,19 @@ Standard Java audio loops suffer from float boxing overhead, slow software resam
 
 ## Performance Benchmarks
 
-In the official [JMH Benchmark](examples/Benchmark), `FastAudioProcess` measured throughput for 44.1kHz audio frame processing:
+In the official [JMH Benchmark](examples/Benchmark), `FastAudioProcess` measured throughput across real-time DSP audio operations on 512-sample (16 kHz / 32 ms) frames:
 
 ```text
-Benchmark                                     Mode  Cnt   Score   Error  Units
-JMH_Audio.benchmarkFastAudioProcessPitch     thrpt    2  24,118          ops/s
+Benchmark                                Mode  Cnt        Score   Units
+JMH_Audio.benchmarkAcousticCrestFactor  thrpt    2  1,619,341   ops/s
+JMH_Audio.benchmarkAcousticZCR          thrpt    2  1,428,964   ops/s
+JMH_Audio.benchmarkStreamingEqualizer   thrpt    2    416,658   ops/s
+JMH_Audio.benchmarkFastFFT              thrpt    2    182,448   ops/s
+JMH_Audio.benchmarkPitchDetection       thrpt    2     48,836   ops/s
+JMH_Audio.benchmarkSpectralDenoise      thrpt    2      8,189   ops/s
 ```
 
-> **24,000+ Pitch Detections / sec**: `FastAudioProcess` analyzes 1-second 44.1kHz audio buffers at **24,118 operations per second** with **zero JVM Garbage Collection allocations**.
+> **Sub-Microsecond Latency**: Acoustic features execute at **1.6M+ operations/sec**, native AVX2 pitch tracking delivers **48,800+ detections/sec**, and native FastFFT transforms run at **180,000+ transforms/sec** with **zero runtime GC allocations**.
 
 ---
 

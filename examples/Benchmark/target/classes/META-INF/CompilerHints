@@ -3,5 +3,10 @@ dontinline,*.*_avgt_jmhStub
 dontinline,*.*_sample_jmhStub
 dontinline,*.*_ss_jmhStub
 dontinline,*.*_thrpt_jmhStub
-inline,fastaudioprocess/benchmark/JMH_Audio.benchmarkFastAudioProcessPitch
+inline,fastaudioprocess/benchmark/JMH_Audio.benchmarkAcousticCrestFactor
+inline,fastaudioprocess/benchmark/JMH_Audio.benchmarkAcousticZCR
+inline,fastaudioprocess/benchmark/JMH_Audio.benchmarkFastFFT
+inline,fastaudioprocess/benchmark/JMH_Audio.benchmarkPitchDetection
+inline,fastaudioprocess/benchmark/JMH_Audio.benchmarkSpectralDenoise
+inline,fastaudioprocess/benchmark/JMH_Audio.benchmarkStreamingEqualizer
 inline,fastaudioprocess/benchmark/JMH_Audio.setup
