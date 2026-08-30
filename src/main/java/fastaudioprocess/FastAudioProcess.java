@@ -7,22 +7,18 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import javax.sound.sampled.*;
 
-import jdk.incubator.vector.ShortVector;
-import jdk.incubator.vector.VectorSpecies;
-
 /**
- * High-performance hardware SIMD-accelerated audio processing, spectral filtering, and DSP engine for Java.
+ * High-performance audio processing, spectral filtering, and DSP engine for Java.
  * <p>
  * Provides native AVX2 pitch detection (autocorrelation), time-domain SOLA pitch shifting,
  * real-time spectral power noise suppression, dynamic noise gating, and zero-allocation acoustic analysis
- * (Crest Factor, Zero-Crossing Rate, Harmonic Periodicity) without JVM Garbage Collection stalls.
+ * (Crest Factor, Zero-Crossing Rate, Harmonic Periodicity) without JVM Garbage Collection stalls or incubator modules.
  * </p>
  */
 public final class FastAudioProcess {
 
-    // ── 1. Native Substrate & Vector Engine Constants ────────────────────────
+    // ── 1. Native Substrate Constants & Off-Heap Buffer Caches ────────────────
     private static final boolean NATIVE_LOADED;
-    private static final VectorSpecies<Float> SPECIES = jdk.incubator.vector.FloatVector.SPECIES_PREFERRED;
     private static final ThreadLocal<float[]> THREAD_LOCAL_BUFFER = ThreadLocal.withInitial(() -> new float[16384]);
 
     static {
@@ -163,7 +159,6 @@ public final class FastAudioProcess {
 
     /**
      * Computes Root Mean Square (RMS) volume level of a PCM audio buffer from offset.
-     * Accelerated using Java 17 Vector API (SIMD).
      *
      * @param buffer raw 16-bit PCM bytes
      * @param offset starting byte offset
@@ -174,34 +169,14 @@ public final class FastAudioProcess {
         int count = length / 2;
         if (count == 0) return 0f;
 
-        float[] samples = THREAD_LOCAL_BUFFER.get();
-        if (samples.length < count) {
-            samples = new float[count * 2];
-            THREAD_LOCAL_BUFFER.set(samples);
-        }
-
+        double sum = 0.0;
         for (int i = 0; i < count; i++) {
             int byteIndex = offset + (i * 2);
-            samples[i] = (short) ((buffer[byteIndex + 1] << 8) | (buffer[byteIndex] & 0xff));
+            short sample = (short) ((buffer[byteIndex + 1] << 8) | (buffer[byteIndex] & 0xff));
+            sum += (double) sample * (double) sample;
         }
 
-        int i = 0;
-        int limit = count - (count % SPECIES.length());
-
-        jdk.incubator.vector.FloatVector sumVector = jdk.incubator.vector.FloatVector.zero(SPECIES);
-
-        for (; i < limit; i += SPECIES.length()) {
-            jdk.incubator.vector.FloatVector v = jdk.incubator.vector.FloatVector.fromArray(SPECIES, samples, i);
-            sumVector = sumVector.add(v.mul(v));
-        }
-
-        float sum = sumVector.reduceLanes(jdk.incubator.vector.VectorOperators.ADD);
-
-        for (; i < count; i++) {
-            sum += samples[i] * samples[i];
-        }
-
-        return (float) (Math.sqrt((double) sum / count) / 32768.0);
+        return (float) (Math.sqrt(sum / count) / 32768.0);
     }
 
     /**
@@ -362,48 +337,25 @@ public final class FastAudioProcess {
         }
     }
 
-    // ── 5. Vectorized Audio Normalization, DSP & Mixing ──────────────────────
+    // ── 5. Audio Normalization, DSP & Mixing ──────────────────────────────────
 
     /**
      * Normalizes amplitude of audio samples in-place so peak reaches targetPeak.
-     * Accelerated using Java 17 Vector API (SIMD).
      *
      * @param samples    audio buffer (modified in-place)
      * @param targetPeak target absolute peak value (e.g. 0.95f)
      */
     public static void normalize(float[] samples, float targetPeak) {
         if (samples == null || samples.length == 0 || targetPeak <= 0) return;
-        int len = samples.length;
-
         float maxVal = 0.0f;
-        int i = 0;
-        int limit = len - (len % SPECIES.length());
-
-        jdk.incubator.vector.FloatVector maxVector = jdk.incubator.vector.FloatVector.zero(SPECIES);
-        for (; i < limit; i += SPECIES.length()) {
-            jdk.incubator.vector.FloatVector v = jdk.incubator.vector.FloatVector.fromArray(SPECIES, samples, i);
-            maxVector = maxVector.max(v.abs());
+        for (float s : samples) {
+            float abs = Math.abs(s);
+            if (abs > maxVal) maxVal = abs;
         }
-
-        maxVal = maxVector.reduceLanes(jdk.incubator.vector.VectorOperators.MAX);
-        for (; i < len; i++) {
-            float absVal = Math.abs(samples[i]);
-            if (absVal > maxVal) {
-                maxVal = absVal;
-            }
-        }
-
         if (maxVal == 0.0f) return;
 
         float scale = targetPeak / maxVal;
-        jdk.incubator.vector.FloatVector scaleVector = jdk.incubator.vector.FloatVector.broadcast(SPECIES, scale);
-
-        i = 0;
-        for (; i < limit; i += SPECIES.length()) {
-            jdk.incubator.vector.FloatVector v = jdk.incubator.vector.FloatVector.fromArray(SPECIES, samples, i);
-            v.mul(scaleVector).intoArray(samples, i);
-        }
-        for (; i < len; i++) {
+        for (int i = 0; i < samples.length; i++) {
             samples[i] *= scale;
         }
     }
@@ -423,7 +375,7 @@ public final class FastAudioProcess {
     }
 
     /**
-     * Mixes multiple audio channels using weights via SIMD vector acceleration.
+     * Mixes multiple audio channels using weights.
      *
      * @param channels 2D array of [numChannels][sampleCount]
      * @param weights  mixing weight factors per channel
@@ -435,21 +387,7 @@ public final class FastAudioProcess {
         int len = channels[0].length;
         float[] output = new float[len];
 
-        int i = 0;
-        int limit = len - (len % SPECIES.length());
-
-        for (; i < limit; i += SPECIES.length()) {
-            jdk.incubator.vector.FloatVector mixVector = jdk.incubator.vector.FloatVector.zero(SPECIES);
-            for (int c = 0; c < numChannels; c++) {
-                float w = (weights != null && c < weights.length) ? weights[c] : 1.0f / numChannels;
-                jdk.incubator.vector.FloatVector wVector = jdk.incubator.vector.FloatVector.broadcast(SPECIES, w);
-                jdk.incubator.vector.FloatVector cVector = jdk.incubator.vector.FloatVector.fromArray(SPECIES, channels[c], i);
-                mixVector = mixVector.add(cVector.mul(wVector));
-            }
-            mixVector.intoArray(output, i);
-        }
-
-        for (; i < len; i++) {
+        for (int i = 0; i < len; i++) {
             float sum = 0.0f;
             for (int c = 0; c < numChannels; c++) {
                 float w = (weights != null && c < weights.length) ? weights[c] : 1.0f / numChannels;
