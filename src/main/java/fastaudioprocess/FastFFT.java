@@ -1,11 +1,22 @@
 package fastaudioprocess;
 
 /**
- * High-performance O(N log N) in-place Cooley-Tukey Radix-2 Fast Fourier Transform.
+ * High-Performance in-place Cooley-Tukey Radix-2 Fast Fourier Transform (FFT) and Inverse FFT (IFFT).
  * <p>
- * Employs precomputed trigonometric twiddle tables and bit-reversal lookup plans
- * for zero-allocation, deterministic execution.
+ * Computes frequency-domain and time-domain signal representations with {@code O(N log N)} algorithmic complexity.
+ * Utilizes precomputed bit-reversal permutation tables and trigonometric twiddle factor plans
+ * for zero-allocation deterministic execution, automatically delegating to native AVX2 SIMD kernels when available.
  * </p>
+ *
+ * <h2>Usage Example:</h2>
+ * <pre>{@code
+ * float[] real = new float[512];
+ * float[] imag = new float[512];
+ *
+ * // Fill real with audio samples...
+ * FastFFT.fft(real, imag);  // Forward FFT -> converts to frequency spectrum
+ * FastFFT.ifft(real, imag); // Inverse IFFT -> converts back to time-domain
+ * }</pre>
  */
 public final class FastFFT {
 
@@ -46,13 +57,20 @@ public final class FastFFT {
     private FastFFT() {
     }
 
-    public static native void fftNative(float[] real, float[] imag);
-
     /**
-     * Computes the forward in-place Radix-2 FFT using precalculated twiddle plans.
+     * Native AVX2 hardware-accelerated in-place forward Radix-2 FFT kernel.
      *
      * @param real real component array (length must be a power of 2)
      * @param imag imaginary component array (same length as real)
+     */
+    public static native void fftNative(float[] real, float[] imag);
+
+    /**
+     * Computes the forward in-place Radix-2 FFT of complex buffers ({@code real}, {@code imag}).
+     * Converts time-domain audio samples into discrete frequency spectrum bins.
+     *
+     * @param real real component array (modified in-place, length must be a power of 2 &lt;= 16384)
+     * @param imag imaginary component array (modified in-place, same length as real)
      */
     public static void fft(float[] real, float[] imag) {
         if (real == null || imag == null || real.length <= 1) return;
@@ -105,10 +123,11 @@ public final class FastFFT {
     }
 
     /**
-     * Computes the inverse in-place Radix-2 IFFT.
+     * Computes the inverse in-place Radix-2 IFFT of complex buffers ({@code real}, {@code imag}).
+     * Converts frequency-domain spectrum bins back into time-domain audio samples.
      *
-     * @param real real component array (length must be a power of 2)
-     * @param imag imaginary component array (same length as real)
+     * @param real real component array (modified in-place, length must be a power of 2)
+     * @param imag imaginary component array (modified in-place, same length as real)
      */
     public static void ifft(float[] real, float[] imag) {
         if (real == null || imag == null || real.length <= 1) return;
