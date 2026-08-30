@@ -149,13 +149,17 @@ Captures low-latency Windows audio streams for `FastAudioProcess`.
 
 | Method | Description | Path |
 |--------|-------------|------|
-| `suppressNoise(samples, rate, factor, floor)` | Real-time spectral power subtraction noise filter. | [Reference 📖](docs/REFERENCE.md#suppressnoise) |
-| `computeCrestFactor(samples)` | Spectral Crest Factor (Peak / RMS) transient spike detector. | [Reference 📖](docs/REFERENCE.md#computecrestfactor) |
-| `computeZeroCrossingRate(samples)` | Normalized Zero-Crossing Rate (ZCR) sign-change ratio. | [Reference 📖](docs/REFERENCE.md#computezcr) |
-| `computeAutocorrelationPeriodicity(samples, min, max)` | Normalized pitch harmonic periodicity ratio. | [Reference 📖](docs/REFERENCE.md#computeperiodicity) |
-| `applyNoiseGate(samples, thresholdDb, reductionDb)` | Fast dynamic downward expander noise gate. | [Reference 📖](docs/REFERENCE.md#applynoisegate) |
-| `detectPitchNative(samples, rate)` | AVX2 SIMD pitch detection using autocorrelation. | [Reference 📖](docs/REFERENCE.md#detectpitch) |
-| `pitchShiftNative(samples, semitones, rate)` | SOLA native pitch shifter algorithm. | [Reference 📖](docs/REFERENCE.md#pitchshift) |
+| `suppressNoise(samples, rate, factor, floor)` | Real-time spectral power subtraction noise filter. | [Reference](docs/REFERENCE.md#suppressnoise) |
+| `computeCrestFactor(samples)` | Spectral Crest Factor (Peak / RMS) transient spike detector. | [Reference](docs/REFERENCE.md#computecrestfactor) |
+| `computeZeroCrossingRate(samples)` | Normalized Zero-Crossing Rate (ZCR) sign-change ratio. | [Reference](docs/REFERENCE.md#computezcr) |
+| `computeAutocorrelationPeriodicity(samples, min, max)` | Normalized pitch harmonic periodicity ratio. | [Reference](docs/REFERENCE.md#computeperiodicity) |
+| `logMelSpectrogram(samples, rate, fft, hop, bins)` | High-accuracy triangular Mel-filterbank spectrogram. | [Reference](docs/REFERENCE.md#logmelspectrogram) |
+| `applyNoiseGate(samples, thresholdDb, reductionDb)` | Fast dynamic downward expander noise gate. | [Reference](docs/REFERENCE.md#applynoisegate) |
+| `detectPitchNative(samples, rate)` | AVX2 SIMD pitch detection using autocorrelation. | [Reference](docs/REFERENCE.md#detectpitch) |
+| `pitchShiftNative(samples, semitones, rate)` | Zero-allocation time-domain pitch modulation algorithm. | [Reference](docs/REFERENCE.md#pitchshift) |
+| `FastAudioEqualizer` | Stateful 3-band streaming IIR equalizer. | [Reference](docs/REFERENCE.md#equalizer) |
+| `FastAudioChunker` | Lock-free SPSC power-of-two frame chunker. | [Reference](docs/REFERENCE.md#chunker) |
+| `FastFFT` | Forward & inverse Radix-2 Fast Fourier Transform. | [Reference](docs/REFERENCE.md#fft) |
 
 ---
 
