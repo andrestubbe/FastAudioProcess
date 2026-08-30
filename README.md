@@ -245,8 +245,6 @@ Download the latest JAR directly to add it to your classpath:
 
 ---
 
----
-
 ## Documentation
 
 - [COMPILE.md](docs/COMPILE.md): Full compilation guide (MSVC Native AVX2 & Maven Build Setup).
