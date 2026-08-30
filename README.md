@@ -260,6 +260,10 @@ MIT License — See [LICENSE](LICENSE) for details.
 
 - [FastVAD](https://github.com/andrestubbe/FastVAD) — Real-time Voice Activity Detection with sub-10ms latency
 - [FastAudioCapture](https://github.com/andrestubbe/FastAudioCapture) — Zero-copy WASAPI audio loopback & microphone capture
+- [FastTurn](https://github.com/andrestubbe/FastTurn) — Real-time turn-taking and speech interruption latency detector
+- [FastWakeWord](https://github.com/andrestubbe/FastWakeWord) — Neural wake-word and keyword spotting detector
+- [FastSTT](https://github.com/andrestubbe/FastSTT) — High-throughput local speech-to-text recognition
+- [FastTTS](https://github.com/andrestubbe/FastTTS) — Low-latency neural text-to-speech synthesis
 - [FastSIMD](https://github.com/andrestubbe/FastSIMD) — Hardware SIMD vectorization primitives
 - [FastCore](https://github.com/andrestubbe/FastCore) — Native JNI Loader and Utilities
 - [FastExecution](https://github.com/andrestubbe/FastExecution) — High-precision audio scheduling engine
