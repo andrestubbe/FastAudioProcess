@@ -1,7 +1,10 @@
 package fastaudioprocess;
 
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import javax.sound.sampled.*;
+
 import jdk.incubator.vector.ShortVector;
 import jdk.incubator.vector.VectorSpecies;
 
@@ -11,6 +14,7 @@ import jdk.incubator.vector.VectorSpecies;
 public final class FastAudioProcess {
 
     private static final String LIBRARY_NAME = "fastaudioprocess";
+
     static {
         loadNativeLibrary();
     }
@@ -40,9 +44,9 @@ public final class FastAudioProcess {
     }
 
     private static void loadFromStream(InputStream in) throws Exception {
-        java.nio.file.Path tempDir = java.nio.file.Files.createTempDirectory("fastaudioprocess");
-        java.nio.file.Path tempLib = tempDir.resolve("fastaudioprocess.dll");
-        java.nio.file.Files.copy(in, tempLib, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        Path tempDir = Files.createTempDirectory("fastaudioprocess");
+        Path tempLib = tempDir.resolve("fastaudioprocess.dll");
+        Files.copy(in, tempLib, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         tempLib.toFile().deleteOnExit();
         tempDir.toFile().deleteOnExit();
         System.load(tempLib.toString());
@@ -73,13 +77,13 @@ public final class FastAudioProcess {
             AudioFormat baseFormat = mp3Stream.getFormat();
             // Target format: Standard 44100Hz, 16-bit, Stereo, Signed PCM
             AudioFormat decodedFormat = new AudioFormat(
-                AudioFormat.Encoding.PCM_SIGNED,
-                44100.0f,
-                16,
-                2,
-                4,
-                44100.0f,
-                false
+                    AudioFormat.Encoding.PCM_SIGNED,
+                    44100.0f,
+                    16,
+                    2,
+                    4,
+                    44100.0f,
+                    false
             );
 
             // Specify frame length to avoid "stream length not specified" error
@@ -100,18 +104,18 @@ public final class FastAudioProcess {
 
         try (ByteArrayInputStream bais = new ByteArrayInputStream(wavData);
              AudioInputStream sourceStream = AudioSystem.getAudioInputStream(bais)) {
-             
+
             AudioFormat sourceFormat = sourceStream.getFormat();
-            
+
             // Standard target format
             AudioFormat targetFormat = new AudioFormat(
-                AudioFormat.Encoding.PCM_SIGNED,
-                44100.0f,
-                16,
-                2,
-                4,
-                44100.0f,
-                false
+                    AudioFormat.Encoding.PCM_SIGNED,
+                    44100.0f,
+                    16,
+                    2,
+                    4,
+                    44100.0f,
+                    false
             );
 
             // Compute target frame length: (sourceFrameLength * targetSampleRate) / sourceSampleRate
@@ -122,26 +126,26 @@ public final class FastAudioProcess {
                 try (AudioInputStream targetStream = AudioSystem.getAudioInputStream(targetFormat, sourceStream);
                      AudioInputStream lengthStream = new AudioInputStream(targetStream, targetFormat, targetFrameLength);
                      ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-                    
+
                     AudioSystem.write(lengthStream, AudioFileFormat.Type.WAVE, baos);
                     return baos.toByteArray();
                 }
             } else {
                 AudioFormat pcmIntermediate = new AudioFormat(
-                    AudioFormat.Encoding.PCM_SIGNED,
-                    sourceFormat.getSampleRate(),
-                    16,
-                    sourceFormat.getChannels() > 0 ? sourceFormat.getChannels() : 1,
-                    (sourceFormat.getChannels() > 0 ? sourceFormat.getChannels() : 1) * 2,
-                    sourceFormat.getSampleRate(),
-                    false
+                        AudioFormat.Encoding.PCM_SIGNED,
+                        sourceFormat.getSampleRate(),
+                        16,
+                        sourceFormat.getChannels() > 0 ? sourceFormat.getChannels() : 1,
+                        (sourceFormat.getChannels() > 0 ? sourceFormat.getChannels() : 1) * 2,
+                        sourceFormat.getSampleRate(),
+                        false
                 );
-                
+
                 try (AudioInputStream pcmStream = AudioSystem.getAudioInputStream(pcmIntermediate, sourceStream);
                      AudioInputStream targetStream = AudioSystem.getAudioInputStream(targetFormat, pcmStream);
                      AudioInputStream lengthStream = new AudioInputStream(targetStream, targetFormat, targetFrameLength);
                      ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-                    
+
                     AudioSystem.write(lengthStream, AudioFileFormat.Type.WAVE, baos);
                     return baos.toByteArray();
                 }
@@ -177,23 +181,23 @@ public final class FastAudioProcess {
 
         int i = 0;
         int limit = count - (count % SPECIES.length());
-        
+
         jdk.incubator.vector.FloatVector sumVector = jdk.incubator.vector.FloatVector.zero(SPECIES);
-        
+
         // SIMD vector loop: process N samples at a time
         for (; i < limit; i += SPECIES.length()) {
             jdk.incubator.vector.FloatVector v = jdk.incubator.vector.FloatVector.fromArray(SPECIES, samples, i);
             sumVector = sumVector.add(v.mul(v));
         }
-        
+
         // Reduce the SIMD vector to a single scalar sum
         float sum = sumVector.reduceLanes(jdk.incubator.vector.VectorOperators.ADD);
-        
+
         // Scalar tail loop for remaining elements
         for (; i < count; i++) {
             sum += samples[i] * samples[i];
         }
-        
+
         return (float) (Math.sqrt((double) sum / count) / 32768.0);
     }
 
@@ -215,18 +219,18 @@ public final class FastAudioProcess {
     public static void normalize(float[] samples, float targetPeak) {
         if (samples == null || samples.length == 0 || targetPeak <= 0) return;
         int len = samples.length;
-        
+
         // Find absolute maximum peak
         float maxVal = 0.0f;
         int i = 0;
         int limit = len - (len % SPECIES.length());
-        
+
         jdk.incubator.vector.FloatVector maxVector = jdk.incubator.vector.FloatVector.zero(SPECIES);
         for (; i < limit; i += SPECIES.length()) {
             jdk.incubator.vector.FloatVector v = jdk.incubator.vector.FloatVector.fromArray(SPECIES, samples, i);
             maxVector = maxVector.max(v.abs());
         }
-        
+
         maxVal = maxVector.reduceLanes(jdk.incubator.vector.VectorOperators.MAX);
         for (; i < len; i++) {
             float absVal = Math.abs(samples[i]);
@@ -234,13 +238,13 @@ public final class FastAudioProcess {
                 maxVal = absVal;
             }
         }
-        
+
         if (maxVal == 0.0f) return;
-        
+
         // Scale elements using Vector multiplication
         float scale = targetPeak / maxVal;
         jdk.incubator.vector.FloatVector scaleVector = jdk.incubator.vector.FloatVector.broadcast(SPECIES, scale);
-        
+
         i = 0;
         for (; i < limit; i += SPECIES.length()) {
             jdk.incubator.vector.FloatVector v = jdk.incubator.vector.FloatVector.fromArray(SPECIES, samples, i);
@@ -272,15 +276,15 @@ public final class FastAudioProcess {
         int len = samples.length;
         int numFrames = (len - fftSize) / hopSize + 1;
         if (numFrames <= 0) return new float[0][0];
-        
+
         float[][] melSpec = new float[numFrames][melBins];
-        
+
         // Compute Hann window
         float[] window = new float[fftSize];
         for (int i = 0; i < fftSize; i++) {
             window[i] = (float) (0.5 * (1.0 - Math.cos(2.0 * Math.PI * i / (fftSize - 1))));
         }
-        
+
         // DFT and Mel filtering
         for (int f = 0; f < numFrames; f++) {
             int startIdx = f * hopSize;
@@ -288,7 +292,7 @@ public final class FastAudioProcess {
             for (int i = 0; i < fftSize; i++) {
                 frame[i] = samples[startIdx + i] * window[i];
             }
-            
+
             int specSize = fftSize / 2 + 1;
             float[] mag = new float[specSize];
             for (int k = 0; k < specSize; k++) {
@@ -301,7 +305,7 @@ public final class FastAudioProcess {
                 }
                 mag[k] = (float) Math.sqrt(real * real + imag * imag);
             }
-            
+
             for (int m = 0; m < melBins; m++) {
                 int centerLinear = kIndexForMel(m, sampleRate, fftSize, melBins);
                 float energy = 0.0f;
@@ -316,7 +320,7 @@ public final class FastAudioProcess {
         }
         return melSpec;
     }
-    
+
     private static int kIndexForMel(int melBin, int sampleRate, int fftSize, int melBins) {
         double minMel = 0.0;
         double maxMel = 2595.0 * Math.log10(1.0 + (sampleRate / 2.0) / 700.0);
@@ -356,10 +360,10 @@ public final class FastAudioProcess {
         int numChannels = channels.length;
         int len = channels[0].length;
         float[] output = new float[len];
-        
+
         int i = 0;
         int limit = len - (len % SPECIES.length());
-        
+
         for (; i < limit; i += SPECIES.length()) {
             jdk.incubator.vector.FloatVector mixVector = jdk.incubator.vector.FloatVector.zero(SPECIES);
             for (int c = 0; c < numChannels; c++) {
@@ -370,7 +374,7 @@ public final class FastAudioProcess {
             }
             mixVector.intoArray(output, i);
         }
-        
+
         for (; i < len; i++) {
             float sum = 0.0f;
             for (int c = 0; c < numChannels; c++) {
@@ -379,7 +383,7 @@ public final class FastAudioProcess {
             }
             output[i] = sum;
         }
-        
+
         return output;
     }
 
@@ -427,7 +431,7 @@ public final class FastAudioProcess {
             count -= hopSize;
             return chunk;
         }
-        
+
         public synchronized int availableSamples() {
             return count;
         }
@@ -466,14 +470,14 @@ public final class FastAudioProcess {
 
         float lp = 0.0f;
         float hp = 0.0f;
-        float alphaL = 0.15f; 
-        float alphaH = 0.75f; 
+        float alphaL = 0.15f;
+        float alphaH = 0.75f;
 
         for (int i = 0; i < samples.length; i++) {
             float input = samples[i];
             lp = lp + alphaL * (input - lp);
             float bass = lp;
-            hp = alphaH * (hp + input - (i > 0 ? samples[i-1] : input));
+            hp = alphaH * (hp + input - (i > 0 ? samples[i - 1] : input));
             float treble = hp;
             float mid = input - bass - treble;
             samples[i] = bass * bassGain + mid * midGain + treble * trebleGain;
@@ -521,10 +525,10 @@ public final class FastAudioProcess {
      * Suppresses stationary acoustic background noise (fans, hums, mic hiss) in-place
      * using spectral power subtraction and Wiener gain smoothing.
      *
-     * @param samples          raw audio frame samples (modified in-place)
-     * @param sampleRate       sample rate in Hz (e.g. 16000 or 44100)
-     * @param reductionFactor  noise attenuation factor (e.g. 0.85f for gentle, 1.5f for aggressive)
-     * @param spectralFloor    minimum spectral gain floor to prevent musical noise artifacts (e.g. 0.02f)
+     * @param samples         raw audio frame samples (modified in-place)
+     * @param sampleRate      sample rate in Hz (e.g. 16000 or 44100)
+     * @param reductionFactor noise attenuation factor (e.g. 0.85f for gentle, 1.5f for aggressive)
+     * @param spectralFloor   minimum spectral gain floor to prevent musical noise artifacts (e.g. 0.02f)
      */
     public static void suppressNoise(float[] samples, int sampleRate, float reductionFactor, float spectralFloor) {
         if (samples == null || samples.length < 32) return;
@@ -541,19 +545,19 @@ public final class FastAudioProcess {
         int half = n / 2 + 1;
         float[] real = new float[half];
         float[] imag = new float[half];
-        float[] mag  = new float[half];
+        float[] mag = new float[half];
 
         for (int k = 0; k < half; k++) {
             float r = 0.0f;
             float im = 0.0f;
             for (int t = 0; t < n; t++) {
                 double angle = 2.0 * Math.PI * k * t / n;
-                r  += windowed[t] * (float) Math.cos(angle);
+                r += windowed[t] * (float) Math.cos(angle);
                 im -= windowed[t] * (float) Math.sin(angle);
             }
             real[k] = r;
             imag[k] = im;
-            mag[k]  = (float) Math.sqrt(r * r + im * im);
+            mag[k] = (float) Math.sqrt(r * r + im * im);
         }
 
         // 3. Noise Profile Estimation (lowest 15% quantile spectral floor)
@@ -640,23 +644,30 @@ public final class FastAudioProcess {
      * @return normalized harmonicity ratio in [0.0, 1.0], where &gt; 0.35 indicates voiced speech/music
      */
     public static float computeAutocorrelationPeriodicity(float[] samples, int minLag, int maxLag) {
-        if (samples == null || samples.length <= maxLag) return 0.0f;
+        if (samples == null || samples.length <= minLag) return 0.0f;
         int n = samples.length;
+        int maxL = Math.min(maxLag, n / 2);
+
         double r0 = 0.0;
         for (float s : samples) r0 += (s * s);
         if (r0 < 1e-6) return 0.0f;
 
-        double maxAutocorr = 0.0;
-        for (int lag = minLag; lag <= maxLag; lag += 2) {
+        double maxNormAutocorr = 0.0;
+        for (int lag = minLag; lag <= maxL; lag += 2) {
             double sumLag = 0.0;
+            double sumBase = 0.0;
             for (int i = 0; i < n - lag; i++) {
                 sumLag += (samples[i] * samples[i + lag]);
+                sumBase += (samples[i] * samples[i]);
             }
-            if (sumLag > maxAutocorr) {
-                maxAutocorr = sumLag;
+            if (sumBase > 1e-6) {
+                double norm = sumLag / sumBase;
+                if (norm > maxNormAutocorr) {
+                    maxNormAutocorr = norm;
+                }
             }
         }
-        return (float) (maxAutocorr / r0);
+        return (float) maxNormAutocorr;
     }
 
 }
