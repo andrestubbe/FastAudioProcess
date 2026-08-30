@@ -3,24 +3,17 @@
 #include <immintrin.h>
 #include <cmath>
 #include <algorithm>
-
-BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {
-    if (ul_reason_for_call == DLL_PROCESS_ATTACH) {
-        DisableThreadLibraryCalls(hModule);
-    }
-    return TRUE;
-}
+#include <mutex>
 
 static thread_local float g_delayBuffer[16384] = {0.0f};
 
-// Precalculated Static Twiddle Factor Tables for Native FFT (Sizes 2 to 16384)
+// Precalculated Static Twiddle Factor Tables (Sizes 2 to 16384)
 static float g_twiddleReal[15][8192];
 static float g_twiddleImag[15][8192];
 static int g_bitRevTable[15][16384];
-static bool g_tablesInitialized = false;
+static std::once_flag g_fftInitFlag;
 
-static void initFftTables() {
-    if (g_tablesInitialized) return;
+static void initFftTablesInternal() {
     for (int p = 1; p <= 14; p++) {
         int n = 1 << p;
         int j = 0;
@@ -41,7 +34,18 @@ static void initFftTables() {
             g_twiddleImag[p][i] = (float)std::sin(angle);
         }
     }
-    g_tablesInitialized = true;
+}
+
+static inline void ensureFftTablesInitialized() {
+    std::call_once(g_fftInitFlag, initFftTablesInternal);
+}
+
+BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved) {
+    if (ul_reason_for_call == DLL_PROCESS_ATTACH) {
+        DisableThreadLibraryCalls(hModule);
+        ensureFftTablesInitialized(); // Eagerly initialize on DLL attach for 100% thread-safety
+    }
+    return TRUE;
 }
 
 extern "C" {
@@ -191,7 +195,7 @@ JNIEXPORT void JNICALL Java_fastaudioprocess_FastFFT_fftNative(JNIEnv* env, jcla
     jsize n = env->GetArrayLength(realArray);
     if (n <= 1 || (n & (n - 1)) != 0 || n > 16384) return;
 
-    initFftTables();
+    ensureFftTablesInitialized();
 
     float* real = (float*)env->GetPrimitiveArrayCritical(realArray, NULL);
     float* imag = (float*)env->GetPrimitiveArrayCritical(imagArray, NULL);
@@ -252,7 +256,7 @@ JNIEXPORT void JNICALL Java_fastaudioprocess_FastFFT_ifftNative(JNIEnv* env, jcl
     jsize n = env->GetArrayLength(realArray);
     if (n <= 1 || (n & (n - 1)) != 0 || n > 16384) return;
 
-    initFftTables();
+    ensureFftTablesInitialized();
 
     float* real = (float*)env->GetPrimitiveArrayCritical(realArray, NULL);
     float* imag = (float*)env->GetPrimitiveArrayCritical(imagArray, NULL);
@@ -262,7 +266,6 @@ JNIEXPORT void JNICALL Java_fastaudioprocess_FastFFT_ifftNative(JNIEnv* env, jcl
         return;
     }
 
-    // Invert imaginary signs
     for (int i = 0; i < n; i++) imag[i] = -imag[i];
 
     int p = 0;
