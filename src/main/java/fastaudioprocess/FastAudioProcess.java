@@ -1,12 +1,13 @@
 package fastaudioprocess;
 
 import fastcore.FastCore;
+import java.io.File;
 
 /**
- * Core DSP audio processing and time-domain manipulation engine.
+ * High-Performance Hardware-Accelerated Audio Processing and DSP Engine for Java.
  * <p>
- * Provides native AVX2 pitch detection (autocorrelation), time-domain SOLA pitch shifting,
- * RMS energy calculation, multi-channel mixing, amplitude normalization, and 3-band EQ filtering.
+ * Unifies native AVX2 SIMD pitch detection, SOLA pitch modulation, real-time FastFFT noise cancellation,
+ * and zero-allocation acoustic analysis into a clean, cohesive facade.
  * </p>
  */
 public final class FastAudioProcess {
@@ -25,58 +26,28 @@ public final class FastAudioProcess {
     }
 
     private FastAudioProcess() {
-        // Static utility class
     }
 
-    /**
-     * Returns true if the native C++ AVX2 hardware acceleration DLL is active.
-     *
-     * @return true if native acceleration is loaded, false otherwise
-     */
     public static boolean isNativeLoaded() {
         return NATIVE_LOADED;
     }
 
-    /**
-     * Estimates the fundamental frequency (pitch F0 in Hz) using native SIMD autocorrelation.
-     *
-     * @param samples    raw audio samples in [-1.0, 1.0]
-     * @param sampleRate audio sampling rate in Hz (e.g. 16000 or 44100)
-     * @return estimated pitch in Hertz (Hz), or 0.0 if unvoiced/silent
-     */
+    // ── Native DSP Methods ───────────────────────────────────────────────────
+
     public static native float detectPitchNative(float[] samples, int sampleRate);
 
-    /**
-     * Shifts pitch of audio samples natively using SOLA without altering playback duration.
-     *
-     * @param samples    audio samples to shift (modified in-place)
-     * @param semitones  pitch shift in musical semitones (+/-)
-     * @param sampleRate audio sampling rate in Hz
-     */
     public static native void pitchShiftNative(float[] samples, float semitones, int sampleRate);
 
-    /**
-     * Computes Root Mean Square (RMS) energy level of a byte buffer.
-     *
-     * @param buffer    raw 16-bit PCM bytes
-     * @param bytesRead total valid bytes in buffer
-     * @return normalized RMS volume level in range [0.0, 1.0]
-     */
+    // ── RMS & Energy Measurement ─────────────────────────────────────────────
+
     public static float computeRms(byte[] buffer, int bytesRead) {
         return computeRms(buffer, 0, bytesRead);
     }
 
-    /**
-     * Computes Root Mean Square (RMS) volume level of a PCM audio buffer from offset.
-     *
-     * @param buffer raw 16-bit PCM bytes
-     * @param offset starting byte offset
-     * @param length byte length to process
-     * @return normalized RMS volume level in range [0.0, 1.0]
-     */
     public static float computeRms(byte[] buffer, int offset, int length) {
+        if (buffer == null || length <= 0) return 0.0f;
         int count = length / 2;
-        if (count == 0) return 0f;
+        if (count == 0) return 0.0f;
 
         double sum = 0.0;
         for (int i = 0; i < count; i++) {
@@ -88,14 +59,6 @@ public final class FastAudioProcess {
         return (float) (Math.sqrt(sum / count) / 32768.0);
     }
 
-    /**
-     * Computes average frame energy from short samples.
-     *
-     * @param samples 16-bit PCM short array
-     * @param offset  start index
-     * @param length  number of samples
-     * @return normalized mean square energy in [0.0, 1.0]
-     */
     public static float computeFrameEnergy(short[] samples, int offset, int length) {
         if (samples == null || length <= 0) return 0.0f;
         double sum = 0.0;
@@ -106,12 +69,6 @@ public final class FastAudioProcess {
         return (float) (sum / length);
     }
 
-    /**
-     * Returns the maximum absolute peak value of an audio frame.
-     *
-     * @param samples audio frame samples
-     * @return peak absolute value in range [0.0, 1.0+]
-     */
     public static float getFramePeak(float[] samples) {
         if (samples == null || samples.length == 0) return 0.0f;
         float max = 0.0f;
@@ -122,14 +79,10 @@ public final class FastAudioProcess {
         return max;
     }
 
-    /**
-     * Normalizes amplitude of audio samples in-place so peak reaches targetPeak.
-     *
-     * @param samples    audio buffer (modified in-place)
-     * @param targetPeak target absolute peak value (e.g. 0.95f)
-     */
+    // ── DSP Filters & Vector Operations ──────────────────────────────────────
+
     public static void normalize(float[] samples, float targetPeak) {
-        if (samples == null || samples.length == 0 || targetPeak <= 0) return;
+        if (samples == null || samples.length == 0 || targetPeak <= 0.0f) return;
         float maxVal = 0.0f;
         for (float s : samples) {
             float abs = Math.abs(s);
@@ -143,13 +96,6 @@ public final class FastAudioProcess {
         }
     }
 
-    /**
-     * Applies a high-pass pre-emphasis filter to the audio samples in-place.
-     * Formula: y[n] = x[n] - factor * x[n-1]
-     *
-     * @param samples audio buffer (modified in-place)
-     * @param factor  pre-emphasis coefficient (typically 0.95 - 0.97)
-     */
     public static void preEmphasis(float[] samples, float factor) {
         if (samples == null || samples.length <= 1) return;
         for (int i = samples.length - 1; i > 0; i--) {
@@ -157,13 +103,6 @@ public final class FastAudioProcess {
         }
     }
 
-    /**
-     * Mixes multiple audio channels using weights.
-     *
-     * @param channels 2D array of [numChannels][sampleCount]
-     * @param weights  mixing weight factors per channel
-     * @return blended audio array
-     */
     public static float[] mixChannels(float[][] channels, float[] weights) {
         if (channels == null || channels.length == 0) return new float[0];
         int numChannels = channels.length;
@@ -182,13 +121,6 @@ public final class FastAudioProcess {
         return output;
     }
 
-    /**
-     * Resamples audio samples linearly to shift pitch by specified semitones.
-     *
-     * @param samples   input audio samples
-     * @param semitones semitones shift (+/-)
-     * @return resampled audio array
-     */
     public static float[] pitchShiftResample(float[] samples, float semitones) {
         if (samples == null || samples.length == 0 || semitones == 0.0f) return samples;
         double factor = Math.pow(2.0, semitones / 12.0);
@@ -207,14 +139,6 @@ public final class FastAudioProcess {
         return output;
     }
 
-    /**
-     * Real-time 3-band Equalizer utilizing Low-pass and High-pass crossover filters.
-     *
-     * @param samples      audio buffer (modified in-place)
-     * @param bassGainDb   bass band gain in dB
-     * @param midGainDb    midrange band gain in dB
-     * @param trebleGainDb treble band gain in dB
-     */
     public static void apply3BandEqualizer(float[] samples, float bassGainDb, float midGainDb, float trebleGainDb) {
         if (samples == null || samples.length == 0) return;
         float bassGain = (float) Math.pow(10.0, bassGainDb / 20.0);
@@ -234,6 +158,75 @@ public final class FastAudioProcess {
             float treble = hp;
             float mid = input - bass - treble;
             samples[i] = bass * bassGain + mid * midGain + treble * trebleGain;
+        }
+    }
+
+    // ── Clean API Delegation Methods for 100% Usability ──────────────────────
+
+    public static void suppressNoise(float[] samples, int sampleRate, float reductionFactor, float spectralFloor) {
+        FastAudioDenoise.suppressNoise(samples, sampleRate, reductionFactor, spectralFloor);
+    }
+
+    public static void applyNoiseGate(float[] samples, float thresholdDb, float reductionDb) {
+        FastAudioDenoise.applyNoiseGate(samples, thresholdDb, reductionDb);
+    }
+
+    public static float computeCrestFactor(float[] samples) {
+        return FastAudioAcoustics.computeCrestFactor(samples);
+    }
+
+    public static float computeZeroCrossingRate(float[] samples) {
+        return FastAudioAcoustics.computeZeroCrossingRate(samples);
+    }
+
+    public static float computeAutocorrelationPeriodicity(float[] samples, int minLag, int maxLag) {
+        return FastAudioAcoustics.computeAutocorrelationPeriodicity(samples, minLag, maxLag);
+    }
+
+    public static float[][] logMelSpectrogram(float[] samples, int sampleRate, int fftSize, int hopSize, int melBins) {
+        return FastAudioAcoustics.logMelSpectrogram(samples, sampleRate, fftSize, hopSize, melBins);
+    }
+
+    public static File mp3ToWav(File mp3File) throws Exception {
+        return FastAudioCodec.mp3ToWav(mp3File);
+    }
+
+    public static byte[] resampleWavTo44100(byte[] wavData) throws Exception {
+        return FastAudioCodec.resampleWavTo44100(wavData);
+    }
+
+    public static float[] generateWaveformPoints(float[] samples, int targetPoints) {
+        return FastAudioCodec.generateWaveformPoints(samples, targetPoints);
+    }
+
+    /**
+     * Backward-compatible alias for FastAudioChunker.
+     */
+    public static final class FrameChunker {
+        private final FastAudioChunker delegate;
+
+        public FrameChunker(int chunkSize, int hopSize) {
+            this.delegate = new FastAudioChunker(chunkSize, hopSize);
+        }
+
+        public void push(float[] samples) {
+            delegate.push(samples);
+        }
+
+        public boolean nextChunk(float[] destination) {
+            return delegate.nextChunk(destination);
+        }
+
+        public float[] nextChunk() {
+            return delegate.nextChunk();
+        }
+
+        public void reset() {
+            delegate.reset();
+        }
+
+        public int availableSamples() {
+            return delegate.availableSamples();
         }
     }
 }

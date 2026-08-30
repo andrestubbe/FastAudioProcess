@@ -3,4 +3,5 @@ fastaudioprocess\FastAudioChunker.class
 fastaudioprocess\FastAudioProcess.class
 fastaudioprocess\FastAudioCodec.class
 fastaudioprocess\FastFFT.class
+fastaudioprocess\FastAudioProcess$FrameChunker.class
 fastaudioprocess\FastAudioDenoise.class
