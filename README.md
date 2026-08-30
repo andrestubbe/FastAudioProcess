@@ -18,6 +18,9 @@
 
 ```java
 import fastaudioprocess.FastAudioProcess;
+import fastaudioprocess.FastAudioEqualizer;
+import fastaudioprocess.FastAudioChunker;
+import fastaudioprocess.FastFFT;
 
 public class Demo {
     public static void main(String[] args) {
@@ -27,7 +30,7 @@ public class Demo {
             audio[i] = (float) Math.sin(2.0 * Math.PI * 440.0 * i / 44100.0);
         }
 
-        // 2. Real-time Spectral Subtraction Noise Suppression
+        // 2. Real-time Spectral Subtraction Noise Suppression (FastFFT)
         FastAudioProcess.suppressNoise(audio, 44100, 1.0f, 0.02f);
 
         // 3. Acoustic Feature Analysis (Crest Factor & Periodicity)
@@ -35,9 +38,22 @@ public class Demo {
         float zcr = FastAudioProcess.computeZeroCrossingRate(audio);
         float periodicity = FastAudioProcess.computeAutocorrelationPeriodicity(audio, 35, 160);
 
-        // 4. AVX2 SIMD pitch detection
+        // 4. AVX2 SIMD Pitch Detection with DC Removal
         float pitch = FastAudioProcess.detectPitchNative(audio, 44100);
         System.out.printf("Pitch: %.2f Hz | Crest: %.2f | ZCR: %.3f | Periodicity: %.2f%n", pitch, crest, zcr, periodicity);
+
+        // 5. Stateful Streaming 3-Band Equalizer (Bass +3dB, Treble +2dB)
+        FastAudioEqualizer eq = new FastAudioEqualizer();
+        eq.setGains(3.0f, 0.0f, 2.0f);
+        eq.process(audio);
+
+        // 6. Lock-Free SPSC Frame Chunking (512 samples window, 160 hop)
+        FastAudioChunker chunker = new FastAudioChunker(512, 160);
+        chunker.push(audio);
+        float[] window = new float[512];
+        while (chunker.nextChunk(window)) {
+            // Ingest into VAD / STT model without allocations...
+        }
     }
 }
 ```
