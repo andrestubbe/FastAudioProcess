@@ -517,4 +517,146 @@ public final class FastAudioProcess {
         return max;
     }
 
+    /**
+     * Suppresses stationary acoustic background noise (fans, hums, mic hiss) in-place
+     * using spectral power subtraction and Wiener gain smoothing.
+     *
+     * @param samples          raw audio frame samples (modified in-place)
+     * @param sampleRate       sample rate in Hz (e.g. 16000 or 44100)
+     * @param reductionFactor  noise attenuation factor (e.g. 0.85f for gentle, 1.5f for aggressive)
+     * @param spectralFloor    minimum spectral gain floor to prevent musical noise artifacts (e.g. 0.02f)
+     */
+    public static void suppressNoise(float[] samples, int sampleRate, float reductionFactor, float spectralFloor) {
+        if (samples == null || samples.length < 32) return;
+        int n = samples.length;
+
+        // 1. Hann Windowing
+        float[] windowed = new float[n];
+        for (int i = 0; i < n; i++) {
+            float w = (float) (0.5 * (1.0 - Math.cos(2.0 * Math.PI * i / (n - 1))));
+            windowed[i] = samples[i] * w;
+        }
+
+        // 2. Real & Imaginary DFT Bins
+        int half = n / 2 + 1;
+        float[] real = new float[half];
+        float[] imag = new float[half];
+        float[] mag  = new float[half];
+
+        for (int k = 0; k < half; k++) {
+            float r = 0.0f;
+            float im = 0.0f;
+            for (int t = 0; t < n; t++) {
+                double angle = 2.0 * Math.PI * k * t / n;
+                r  += windowed[t] * (float) Math.cos(angle);
+                im -= windowed[t] * (float) Math.sin(angle);
+            }
+            real[k] = r;
+            imag[k] = im;
+            mag[k]  = (float) Math.sqrt(r * r + im * im);
+        }
+
+        // 3. Noise Profile Estimation (lowest 15% quantile spectral floor)
+        float noiseEstimate = 0.0f;
+        for (int k = 0; k < half; k++) {
+            noiseEstimate += mag[k];
+        }
+        noiseEstimate = (noiseEstimate / half) * 0.25f;
+
+        // 4. Spectral Subtraction with Musical Noise Over-subtraction Protection
+        for (int k = 0; k < half; k++) {
+            float originalMag = mag[k];
+            float cleanedMag = originalMag - (reductionFactor * noiseEstimate);
+            float minAllowed = originalMag * spectralFloor;
+            if (cleanedMag < minAllowed) {
+                cleanedMag = minAllowed;
+            }
+
+            float gain = originalMag > 1e-6f ? (cleanedMag / originalMag) : spectralFloor;
+            real[k] *= gain;
+            imag[k] *= gain;
+        }
+
+        // 5. Inverse Synthesis (IDFT) back to time-domain
+        for (int t = 0; t < n; t++) {
+            float val = real[0] + (n % 2 == 0 ? real[half - 1] * (float) Math.cos(Math.PI * t) : 0.0f);
+            for (int k = 1; k < half - 1; k++) {
+                double angle = 2.0 * Math.PI * k * t / n;
+                val += 2.0f * (real[k] * (float) Math.cos(angle) - imag[k] * (float) Math.sin(angle));
+            }
+            samples[t] = val / n;
+        }
+    }
+
+    /**
+     * Computes the Spectral Crest Factor (Peak / RMS) of an audio frame.
+     * High values (&gt; 4.0) identify sharp impulsive transient spikes (claps, clicks, cutlery clatter),
+     * while typical speech and music exhibit moderate values (2.0 - 3.5).
+     *
+     * @param samples raw audio frame samples
+     * @return crest factor ratio (dimensionless), or 0.0 if frame is silent
+     */
+    public static float computeCrestFactor(float[] samples) {
+        if (samples == null || samples.length == 0) return 0.0f;
+        float peak = 0.0f;
+        double sumSq = 0.0;
+        for (float s : samples) {
+            float abs = Math.abs(s);
+            if (abs > peak) peak = abs;
+            sumSq += (s * s);
+        }
+        double rms = Math.sqrt(sumSq / samples.length);
+        if (rms < 1e-6) return 0.0f;
+        return (float) (peak / rms);
+    }
+
+    /**
+     * Computes the Zero-Crossing Rate (ZCR) of an audio buffer.
+     * Normalized ratio in range [0.0, 1.0] representing sign changes per sample.
+     *
+     * @param samples raw audio frame samples
+     * @return normalized zero-crossing rate from 0.0 (DC / low-frequency) to 1.0 (Nyquist noise)
+     */
+    public static float computeZeroCrossingRate(float[] samples) {
+        if (samples == null || samples.length <= 1) return 0.0f;
+        int zeroCrossings = 0;
+        float prev = samples[0];
+        for (int i = 1; i < samples.length; i++) {
+            float cur = samples[i];
+            if ((cur >= 0.0f && prev < 0.0f) || (cur < 0.0f && prev >= 0.0f)) {
+                zeroCrossings++;
+            }
+            prev = cur;
+        }
+        return (float) zeroCrossings / (float) (samples.length - 1);
+    }
+
+    /**
+     * Measures the fundamental harmonic pitch periodicity via normalized autocorrelation.
+     *
+     * @param samples raw audio frame samples
+     * @param minLag  minimum sample lag (e.g. 35 for ~450 Hz at 16 kHz)
+     * @param maxLag  maximum sample lag (e.g. 160 for ~100 Hz at 16 kHz)
+     * @return normalized harmonicity ratio in [0.0, 1.0], where &gt; 0.35 indicates voiced speech/music
+     */
+    public static float computeAutocorrelationPeriodicity(float[] samples, int minLag, int maxLag) {
+        if (samples == null || samples.length <= maxLag) return 0.0f;
+        int n = samples.length;
+        double r0 = 0.0;
+        for (float s : samples) r0 += (s * s);
+        if (r0 < 1e-6) return 0.0f;
+
+        double maxAutocorr = 0.0;
+        for (int lag = minLag; lag <= maxLag; lag += 2) {
+            double sumLag = 0.0;
+            for (int i = 0; i < n - lag; i++) {
+                sumLag += (samples[i] * samples[i + lag]);
+            }
+            if (sumLag > maxAutocorr) {
+                maxAutocorr = sumLag;
+            }
+        }
+        return (float) (maxAutocorr / r0);
+    }
+
 }

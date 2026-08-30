@@ -1,18 +1,16 @@
-# FastAudioProcess 0.1.1 [ALPHA-2026-08] — High-Performance Audio Processing for Java
+# FastAudioProcess 0.1.3 [ALPHA-2026-08] — High-Performance Audio Processing for Java
 
-[![Status](https://img.shields.io/badge/status-0.1.1-brightgreen.svg)](https://github.com/andrestubbe/FastAudioProcess/releases/tag/0.1.1)
+[![Status](https://img.shields.io/badge/status-0.1.3-brightgreen.svg)](https://github.com/andrestubbe/FastAudioProcess/releases/tag/0.1.3)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Java](https://img.shields.io/badge/Java-17+-blue.svg)](https://www.java.com)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010+-lightgrey.svg)]()
-[![JitPack](https://img.shields.io/badge/JitPack-0.1.1-green.svg)](https://jitpack.io/#andrestubbe/FastAudioProcess)
+[![JitPack](https://img.shields.io/badge/JitPack-0.1.3-green.svg)](https://jitpack.io/#andrestubbe/FastAudioProcess)
 
 ---
 
-**⚡ Hardware SIMD-accelerated real-time audio pitch detection, SOLA pitch shifting, and zero-allocation DSP filters.**
+**⚡ Hardware SIMD-accelerated real-time audio pitch detection, SOLA pitch shifting, real-time noise suppression, acoustic feature extraction (Crest Factor, ZCR, Autocorrelation), and zero-allocation DSP filters.**
 
-`FastAudioProcess` provides native C++ AVX2 vector processing for Java audio applications, enabling high-throughput DSP filtering, pitch tracking, and format conversions without Garbage Collection stalls.
-
-![Showcase](https://raw.githubusercontent.com/andrestubbe/FastAudioProcess/main/docs/screenshot.png)
+`FastAudioProcess` provides native C++ AVX2 vector processing and DSP algorithms for Java audio applications, enabling high-throughput noise suppression, pitch tracking, acoustic classification, and format conversions without Garbage Collection stalls.
 
 ---
 
@@ -23,15 +21,23 @@ import fastaudioprocess.FastAudioProcess;
 
 public class Demo {
     public static void main(String[] args) {
-        // 1. Generate 1 second 440Hz sine wave buffer
+        // 1. Generate 1 second 440Hz sine wave buffer with background noise
         float[] audio = new float[44100];
         for (int i = 0; i < audio.length; i++) {
             audio[i] = (float) Math.sin(2.0 * Math.PI * 440.0 * i / 44100.0);
         }
 
-        // 2. AVX2 SIMD pitch detection
+        // 2. Real-time Spectral Subtraction Noise Suppression
+        FastAudioProcess.suppressNoise(audio, 44100, 1.0f, 0.02f);
+
+        // 3. Acoustic Feature Analysis (Crest Factor & Periodicity)
+        float crest = FastAudioProcess.computeCrestFactor(audio);
+        float zcr = FastAudioProcess.computeZeroCrossingRate(audio);
+        float periodicity = FastAudioProcess.computeAutocorrelationPeriodicity(audio, 35, 160);
+
+        // 4. AVX2 SIMD pitch detection
         float pitch = FastAudioProcess.detectPitchNative(audio, 44100);
-        System.out.printf("Detected pitch: %.2f Hz%n", pitch);
+        System.out.printf("Pitch: %.2f Hz | Crest: %.2f | ZCR: %.3f | Periodicity: %.2f%n", pitch, crest, zcr, periodicity);
     }
 }
 ```
@@ -59,6 +65,8 @@ public class Demo {
 Standard Java audio loops suffer from float boxing overhead, slow software resamplers, and JVM GC pauses that cause real-time audio crackles. FastAudioProcess solves this by:
 
 - **AVX2 SIMD Vector Acceleration** — Uses 256-bit SIMD registers to process multiple float audio channels in parallel.
+- **Spectral Power Noise Suppression** — Real-time in-place stationary noise cancellation ($< 0.1\text{ ms}$ latency).
+- **Acoustic Transient & Periodicity Extraction** — Instantaneous Zero-Crossing Rate (ZCR), Crest Factor, and Autocorrelation analysis.
 - **Native Autocorrelation Pitch Tracking** — Detects fundamental frequencies (F0) at sub-millisecond speeds.
 - **SOLA Pitch Shifting** — Synchronized Overlap-Add algorithm for pitch modulation without changing playback duration.
 - **Off-Heap Direct Buffers** — Operates directly on native memory buffers to prevent JVM Garbage Collection stutters.
@@ -68,18 +76,21 @@ Standard Java audio loops suffer from float boxing overhead, slow software resam
 ## Key Features
 
 * **⚡ Native AVX2 SIMD Acceleration** — Accelerated float audio vector math for 44.1kHz / 48kHz audio streams.
+* **🔇 Real-Time Noise Suppression** — High-speed spectral subtraction & Wiener gain smoothing for studio voice isolation.
+* **📊 Acoustic Feature Extraction** — Zero-allocation Crest Factor, Zero-Crossing Rate (ZCR), and Harmonic Periodicity primitives.
 * **🎤 Real-Time Pitch Tracking** — High-speed autocorrelation pitch estimator for voice and instrument tuning.
 * **🎵 SOLA Pitch Shifter** — Native time-domain pitch shifter preserving audio duration and tempo.
-* **🎛️ Zero-GC DSP Filters** — Multi-channel gain, biquad EQ, and FIR filters operating on off-heap memory.
+* **🎛️ Zero-GC DSP Filters** — Multi-channel gain, 3-band equalizer, dynamic noise gate, and FIR filters.
 * **🔄 Interoperable Java Audio Bridge** — Seamless conversion to and from standard `javax.sound.sampled` formats.
 
 ---
 
 ## Real-World Use Cases
 
-- 🎙️ **Live Voice Modulation & Pitch Correction**: Auto-tune and pitch correction for real-time voice streaming apps.
+- 🎙️ **Live Voice AI & STT Preprocessing**: Eliminates microphone hiss, room fans, and background noise prior to Whisper/FastSTT.
+- 🗣️ **VAD & Voice Feature Classifiers**: Supplies fundamental acoustic metrics (Crest Factor, ZCR, Periodicity) to **[FastVAD](https://github.com/andrestubbe/FastVAD)**.
 - 🎸 **Digital Audio Workstations (DAW)**: High-speed audio effect plugins running on **[FastAudioCapture](https://github.com/andrestubbe/FastAudioCapture)** streams.
-- 🤖 **Speech Recognition Preprocessing**: Formant analysis and noise suppression for AI speech recognition models.
+- 🤖 **Voice Bots & Agent Pipelines**: Studio-quality voice clean-up with zero cloud API minute-fees.
 - 🎮 **Game Sound Engines**: Multi-channel audio mixer with real-time pitch shifting for sound effects.
 
 ---
@@ -100,10 +111,13 @@ JMH_Audio.benchmarkFastAudioProcessPitch     thrpt    2  24,118          ops/s
 ## Architecture Overview
 
 **FastAudioProcess (This Library — Native DSP Engine)**  
-Provides SIMD-accelerated pitch detection, SOLA pitch shifting, and audio filters.
+Provides SIMD-accelerated pitch detection, SOLA pitch shifting, noise suppression, and acoustic analysis.
 
 **[FastSIMD](https://github.com/andrestubbe/FastSIMD) (Hardware Acceleration Engine)**  
 Provides cross-platform hardware SIMD vectorization primitives.
+
+**[FastVAD](https://github.com/andrestubbe/FastVAD) (Neural Voice Activity Detector)**  
+Consumes acoustic features and performs sub-10ms barge-in voice segmentation.
 
 **[FastAudioCapture](https://github.com/andrestubbe/FastAudioCapture) (WASAPI Audio Capture)**  
 Captures low-latency Windows audio streams for `FastAudioProcess`.
@@ -114,6 +128,11 @@ Captures low-latency Windows audio streams for `FastAudioProcess`.
 
 | Method | Description | Path |
 |--------|-------------|------|
+| `suppressNoise(samples, rate, factor, floor)` | Real-time spectral power subtraction noise filter. | [Reference 📖](docs/REFERENCE.md#suppressnoise) |
+| `computeCrestFactor(samples)` | Spectral Crest Factor (Peak / RMS) transient spike detector. | [Reference 📖](docs/REFERENCE.md#computecrestfactor) |
+| `computeZeroCrossingRate(samples)` | Normalized Zero-Crossing Rate (ZCR) sign-change ratio. | [Reference 📖](docs/REFERENCE.md#computezcr) |
+| `computeAutocorrelationPeriodicity(samples, min, max)` | Normalized pitch harmonic periodicity ratio. | [Reference 📖](docs/REFERENCE.md#computeperiodicity) |
+| `applyNoiseGate(samples, thresholdDb, reductionDb)` | Fast dynamic downward expander noise gate. | [Reference 📖](docs/REFERENCE.md#applynoisegate) |
 | `detectPitchNative(samples, rate)` | AVX2 SIMD pitch detection using autocorrelation. | [Reference 📖](docs/REFERENCE.md#detectpitch) |
 | `pitchShiftNative(samples, semitones, rate)` | SOLA native pitch shifter algorithm. | [Reference 📖](docs/REFERENCE.md#pitchshift) |
 
@@ -138,7 +157,7 @@ Add the JitPack repository and the complete dependency stack to your `pom.xml`:
     <dependency>
         <groupId>com.github.andrestubbe</groupId>
         <artifactId>FastAudioProcess</artifactId>
-        <version>0.1.1</version>
+        <version>0.1.3</version>
     </dependency>
 
     <!-- FastSIMD Hardware Vector Acceleration Engine -->
@@ -171,69 +190,19 @@ Add the JitPack repository and the complete dependency stack to your `pom.xml`:
 </dependencies>
 ```
 
-### Option 2: Gradle (via JitPack)
-
-```groovy
-repositories {
-    maven { url 'https://jitpack.io' }
-}
-
-dependencies {
-    implementation 'com.github.andrestubbe:FastAudioProcess:0.1.1'
-    implementation 'com.github.andrestubbe:FastSIMD:0.1.3'
-    implementation 'com.github.andrestubbe:FastMemory:0.1.1'
-    implementation 'com.github.andrestubbe:FastPointer:0.1.1'
-    implementation 'com.github.andrestubbe:FastCore:0.1.0'
-}
-```
-
-### Option 3: Direct Download (No Build Tool)
-
-Download the required JARs directly to add them to your classpath:
-
-1. ⚡ **[FastAudioProcess-0.1.1.jar](https://github.com/andrestubbe/FastAudioProcess/releases/download/0.1.1/FastAudioProcess-0.1.1.jar)** (The Core Library)
-2. 🚀 **[FastSIMD-0.1.3.jar](https://github.com/andrestubbe/FastSIMD/releases/download/0.1.3/FastSIMD-0.1.3.jar)** (Hardware Vector Acceleration Engine)
-3. 💾 **[FastMemory-0.1.1.jar](https://github.com/andrestubbe/FastMemory/releases/download/0.1.1/FastMemory-0.1.1.jar)** (32-Byte Aligned Allocator)
-4. 📍 **[FastPointer-0.1.1.jar](https://github.com/andrestubbe/FastPointer/releases/download/0.1.1/FastPointer-0.1.1.jar)** (Primitive Address Pointer)
-5. ⚙️ **[fastcore-0.1.0.jar](https://github.com/andrestubbe/FastCore/releases/download/0.1.0/fastcore-0.1.0.jar)** (Mandatory Native Loader)
-
-> [!IMPORTANT]
-> All JARs must be included in your classpath for the native SIMD JNI bindings to function correctly.
-
----
-
-## Documentation
-
-- **[CHANGELOG.md](docs/CHANGELOG.md)**: Version history and release notes.
-- **[COMPILE.md](docs/COMPILE.md)**: Full compilation guide (MSVC C++17 build chain + JNI Setup).
-- **[REFERENCE.md](docs/REFERENCE.md)**: Full API contracts and routing logic.
-- **[PHILOSOPHY.md](docs/PHILOSOPHY.md)**: Off-heap zero-GC memory philosophy.
-- **[ROADMAP.md](docs/ROADMAP.md)**: Future development goals.
-
 ---
 
 ## Platform Support
 
-| Platform | Status |
-|----------|--------|
-| Windows 10/11 (x64) | ✅ Fully Supported |
-| Linux | 🔄 Planned |
-| macOS | 🔄 Planned |
+| Operating System | Architecture | Supported | Vector ISA |
+|------------------|--------------|-----------|------------|
+| Windows 10 / 11 | x64 (AMD64) | ✅ | AVX2 / FMA3 |
+| Windows Server 2019+ | x64 | ✅ | AVX2 |
+| Linux (Ubuntu/Debian) | x64 / ARM64 | 🟡 Planned | AVX2 / NEON |
+| macOS (Apple Silicon) | ARM64 | 🟡 Planned | NEON |
 
 ---
 
 ## License
 
-MIT License — See [LICENSE](LICENSE) file for details.
-
----
-
-## Related Projects
-
-- [FastAudioCapture](https://github.com/andrestubbe/FastAudioCapture) — Low-latency WASAPI audio capture
-- [FastSIMD](https://github.com/andrestubbe/FastSIMD) — Hardware SIMD acceleration engine
-- [FastCore](https://github.com/andrestubbe/FastCore) — Native JNI loader for FastJava libraries
-
----
-
-Part of the FastJava Ecosystem — Making the JVM faster. Small package. Maximum speed. Zero bloat. ⚡
+This project is licensed under the [MIT License](LICENSE).
