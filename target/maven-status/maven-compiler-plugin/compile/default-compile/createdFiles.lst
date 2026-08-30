@@ -1,2 +1,5 @@
+fastaudioprocess\FastAudioAcoustics.class
+fastaudioprocess\FastAudioChunker.class
 fastaudioprocess\FastAudioProcess.class
-fastaudioprocess\FastAudioProcess$FrameChunker.class
+fastaudioprocess\FastAudioCodec.class
+fastaudioprocess\FastAudioDenoise.class

@@ -18,7 +18,7 @@ public class FastAudioProcessTest {
         }
 
         float beforeRms = computeRms(dirty);
-        FastAudioProcess.suppressNoise(dirty, 16000, 1.2f, 0.05f);
+        FastAudioDenoise.suppressNoise(dirty, 16000, 1.2f, 0.05f);
         float afterRms = computeRms(dirty);
 
         assertTrue(afterRms < beforeRms);
@@ -32,7 +32,7 @@ public class FastAudioProcessTest {
             quiet[i] = 0.001f;
         }
 
-        FastAudioProcess.applyNoiseGate(quiet, -30.0f, -40.0f);
+        FastAudioDenoise.applyNoiseGate(quiet, -30.0f, -40.0f);
         for (float s : quiet) {
             assertTrue(s < 0.0001f, "Sub-threshold signal must be attenuated by noise gate");
         }
@@ -46,16 +46,13 @@ public class FastAudioProcessTest {
             sineWave[i] = (float) Math.sin(2.0 * Math.PI * 250.0 * i / 16000.0) * 0.8f;
         }
 
-        // Sine wave has crest factor sqrt(2) ~ 1.414
-        float crest = FastAudioProcess.computeCrestFactor(sineWave);
+        float crest = FastAudioAcoustics.computeCrestFactor(sineWave);
         assertTrue(crest >= 1.3f && crest <= 1.6f, "Crest factor of sine wave must be ~1.414");
 
-        // 250Hz at 16kHz has low ZCR ~ 500 / 16000 = 0.03125
-        float zcr = FastAudioProcess.computeZeroCrossingRate(sineWave);
+        float zcr = FastAudioAcoustics.computeZeroCrossingRate(sineWave);
         assertTrue(zcr < 0.10f, "Low frequency sine wave must have small ZCR");
 
-        // Autocorrelation period for 250Hz is lag 64 (16000/250 = 64)
-        float periodicity = FastAudioProcess.computeAutocorrelationPeriodicity(sineWave, 35, 160);
+        float periodicity = FastAudioAcoustics.computeAutocorrelationPeriodicity(sineWave, 35, 160);
         assertTrue(periodicity > 0.70f, "Harmonic sine wave must have high periodicity");
     }
 
