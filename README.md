@@ -192,6 +192,20 @@ Add the JitPack repository and the complete dependency stack to your `pom.xml`:
         <version>0.1.3</version>
     </dependency>
 
+    <!-- FastMemory Aligned Allocator -->
+    <dependency>
+        <groupId>com.github.andrestubbe</groupId>
+        <artifactId>FastMemory</artifactId>
+        <version>0.1.1</version>
+    </dependency>
+
+    <!-- FastPointer Address Wrapper -->
+    <dependency>
+        <groupId>com.github.andrestubbe</groupId>
+        <artifactId>FastPointer</artifactId>
+        <version>0.1.1</version>
+    </dependency>
+
     <!-- FastCore Native Loader -->
     <dependency>
         <groupId>com.github.andrestubbe</groupId>
@@ -213,6 +227,8 @@ repositories {
 dependencies {
     implementation 'com.github.andrestubbe:FastAudioProcess:0.1.4'
     implementation 'com.github.andrestubbe:FastSIMD:0.1.3'
+    implementation 'com.github.andrestubbe:FastMemory:0.1.1'
+    implementation 'com.github.andrestubbe:FastPointer:0.1.1'
     implementation 'com.github.andrestubbe:FastCore:0.1.0'
 }
 ```
@@ -223,7 +239,9 @@ Download the latest JAR directly to add it to your classpath:
 
 1. 📦 **[FastAudioProcess-0.1.4.jar](https://github.com/andrestubbe/FastAudioProcess/releases/download/0.1.4/FastAudioProcess-0.1.4.jar)** (The Core Library)
 2. 📦 **[FastSIMD-0.1.3.jar](https://github.com/andrestubbe/FastSIMD/releases/download/0.1.3/FastSIMD-0.1.3.jar)** (Vector Math Substrate)
-3. 📦 **[FastCore-0.1.0.jar](https://github.com/andrestubbe/FastCore/releases/download/0.1.0/FastCore-0.1.0.jar)** (Native JNI Extractor & Loader)
+3. 📦 **[FastMemory-0.1.1.jar](https://github.com/andrestubbe/FastMemory/releases/download/0.1.1/FastMemory-0.1.1.jar)** (Aligned Off-Heap Allocator)
+4. 📦 **[FastPointer-0.1.1.jar](https://github.com/andrestubbe/FastPointer/releases/download/0.1.1/FastPointer-0.1.1.jar)** (Memory Address Wrapper)
+5. 📦 **[FastCore-0.1.0.jar](https://github.com/andrestubbe/FastCore/releases/download/0.1.0/FastCore-0.1.0.jar)** (Native JNI Extractor & Loader)
 
 ---
 
