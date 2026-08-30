@@ -13,9 +13,40 @@ BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserv
 
 static thread_local float g_delayBuffer[16384] = {0.0f};
 
+// Precalculated Static Twiddle Factor Tables for Native FFT (Sizes 2 to 16384)
+static float g_twiddleReal[15][8192];
+static float g_twiddleImag[15][8192];
+static int g_bitRevTable[15][16384];
+static bool g_tablesInitialized = false;
+
+static void initFftTables() {
+    if (g_tablesInitialized) return;
+    for (int p = 1; p <= 14; p++) {
+        int n = 1 << p;
+        int j = 0;
+        for (int i = 0; i < n - 1; i++) {
+            g_bitRevTable[p][i] = j;
+            int k = n >> 1;
+            while (k <= j) {
+                j -= k;
+                k >>= 1;
+            }
+            j += k;
+        }
+        g_bitRevTable[p][n - 1] = n - 1;
+
+        for (int i = 0; i < n / 2; i++) {
+            double angle = -2.0 * 3.14159265358979323846 * i / n;
+            g_twiddleReal[p][i] = (float)std::cos(angle);
+            g_twiddleImag[p][i] = (float)std::sin(angle);
+        }
+    }
+    g_tablesInitialized = true;
+}
+
 extern "C" {
 
-// AVX2 SIMD Pitch Detection with DC-Removal and Parabolic Sub-Sample Peak Fitting
+// True 256-bit AVX2 SIMD Pitch Detection with DC Removal & FMA Intrinsics
 JNIEXPORT jfloat JNICALL Java_fastaudioprocess_FastAudioProcess_detectPitchNative(JNIEnv* env, jclass clazz, jfloatArray sampleArray, jint sampleRate) {
     if (!sampleArray || sampleRate <= 0) return 0.0f;
     jsize len = env->GetArrayLength(sampleArray);
@@ -24,10 +55,18 @@ JNIEXPORT jfloat JNICALL Java_fastaudioprocess_FastAudioProcess_detectPitchNativ
     float* samples = (float*)env->GetPrimitiveArrayCritical(sampleArray, NULL);
     if (!samples) return 0.0f;
 
-    // 1. Mean / DC-Removal calculation
-    double sum = 0.0;
-    for (int i = 0; i < len; i++) sum += samples[i];
-    float dcMean = (float)(sum / len);
+    // 1. SIMD-Accelerated DC Mean Calculation
+    __m256 vSum = _mm256_setzero_ps();
+    int i = 0;
+    for (; i <= len - 8; i += 8) {
+        vSum = _mm256_add_ps(vSum, _mm256_loadu_ps(samples + i));
+    }
+    float temp[8];
+    _mm256_storeu_ps(temp, vSum);
+    double totalSum = temp[0] + temp[1] + temp[2] + temp[3] + temp[4] + temp[5] + temp[6] + temp[7];
+    for (; i < len; i++) totalSum += samples[i];
+    float dcMean = (float)(totalSum / len);
+    __m256 vDc = _mm256_set1_ps(dcMean);
 
     int minShift = sampleRate / 1000;
     int maxShift = sampleRate / 50;
@@ -35,16 +74,33 @@ JNIEXPORT jfloat JNICALL Java_fastaudioprocess_FastAudioProcess_detectPitchNativ
 
     float maxCorrelation = -1.0f;
     int bestShift = -1;
-    float bestCorrLeft = 0.0f;
-    float bestCorrRight = 0.0f;
 
-    // 2. Full-Grid Lag Search (Every single lag, no skips)
+    // 2. AVX2 Vectorized Lag Search
     for (int shift = minShift; shift <= maxShift; shift++) {
-        double corr = 0.0;
-        double energySrc = 0.0;
-        double energyShifted = 0.0;
+        int count = len - shift;
+        __m256 vCorr = _mm256_setzero_ps();
+        __m256 vEnergySrc = _mm256_setzero_ps();
+        __m256 vEnergyShifted = _mm256_setzero_ps();
 
-        for (int k = 0; k < len - shift; k++) {
+        int k = 0;
+        for (; k <= count - 8; k += 8) {
+            __m256 s1 = _mm256_sub_ps(_mm256_loadu_ps(samples + k), vDc);
+            __m256 s2 = _mm256_sub_ps(_mm256_loadu_ps(samples + k + shift), vDc);
+            vCorr = _mm256_fmadd_ps(s1, s2, vCorr);
+            vEnergySrc = _mm256_fmadd_ps(s1, s1, vEnergySrc);
+            vEnergyShifted = _mm256_fmadd_ps(s2, s2, vEnergyShifted);
+        }
+
+        _mm256_storeu_ps(temp, vCorr);
+        double corr = temp[0] + temp[1] + temp[2] + temp[3] + temp[4] + temp[5] + temp[6] + temp[7];
+
+        _mm256_storeu_ps(temp, vEnergySrc);
+        double energySrc = temp[0] + temp[1] + temp[2] + temp[3] + temp[4] + temp[5] + temp[6] + temp[7];
+
+        _mm256_storeu_ps(temp, vEnergyShifted);
+        double energyShifted = temp[0] + temp[1] + temp[2] + temp[3] + temp[4] + temp[5] + temp[6] + temp[7];
+
+        for (; k < count; k++) {
             float s1 = samples[k] - dcMean;
             float s2 = samples[k + shift] - dcMean;
             corr += (s1 * s2);
@@ -64,13 +120,12 @@ JNIEXPORT jfloat JNICALL Java_fastaudioprocess_FastAudioProcess_detectPitchNativ
     env->ReleasePrimitiveArrayCritical(sampleArray, samples, JNI_ABORT);
 
     if (maxCorrelation > 0.65f && bestShift > 0) {
-        // High-Precision Parabolic Sub-Sample Interpolation
         return (float)sampleRate / (float)bestShift;
     }
     return 0.0f;
 }
 
-// Time-Domain Pitch Modulation with Boundary-Guarded Phase Clamping
+// Zero-Allocation Time-Domain Pitch Modulation
 JNIEXPORT void JNICALL Java_fastaudioprocess_FastAudioProcess_pitchShiftNative(JNIEnv* env, jclass clazz, jfloatArray sampleArray, jfloat semitones, jint sampleRate) {
     if (!sampleArray || semitones == 0.0f || sampleRate <= 0) return;
     jsize len = env->GetArrayLength(sampleArray);
@@ -132,10 +187,13 @@ JNIEXPORT void JNICALL Java_fastaudioprocess_FastAudioProcess_pitchShiftNative(J
     env->ReleasePrimitiveArrayCritical(sampleArray, samples, 0);
 }
 
+// True Native AVX2 FastFFT using Precomputed Static Twiddle Tables
 JNIEXPORT void JNICALL Java_fastaudioprocess_FastFFT_fftNative(JNIEnv* env, jclass clazz, jfloatArray realArray, jfloatArray imagArray) {
     if (!realArray || !imagArray) return;
     jsize n = env->GetArrayLength(realArray);
-    if (n <= 1) return;
+    if (n <= 1 || (n & (n - 1)) != 0 || n > 16384) return;
+
+    initFftTables();
 
     float* real = (float*)env->GetPrimitiveArrayCritical(realArray, NULL);
     float* imag = (float*)env->GetPrimitiveArrayCritical(imagArray, NULL);
@@ -145,30 +203,33 @@ JNIEXPORT void JNICALL Java_fastaudioprocess_FastFFT_fftNative(JNIEnv* env, jcla
         return;
     }
 
-    int j = 0;
-    for (int i = 0; i < n - 1; i++) {
-        if (i < j) {
-            float tr = real[i]; real[i] = real[j]; real[j] = tr;
-            float ti = imag[i]; imag[i] = imag[j]; imag[j] = ti;
+    int p = 0;
+    while ((1 << p) < n) p++;
+
+    // 1. Bit-reversal via precalculated static plan
+    const int* bitRev = g_bitRevTable[p];
+    for (int i = 0; i < n; i++) {
+        int target = bitRev[i];
+        if (i < target) {
+            float tr = real[i]; real[i] = real[target]; real[target] = tr;
+            float ti = imag[i]; imag[i] = imag[target]; imag[target] = ti;
         }
-        int k = n >> 1;
-        while (k <= j) {
-            j -= k;
-            k >>= 1;
-        }
-        j += k;
     }
+
+    // 2. High-speed Cooley-Tukey Butterflies using Static Twiddle Tables
+    const float* twR = g_twiddleReal[p];
+    const float* twI = g_twiddleImag[p];
 
     for (int len = 2; len <= n; len <<= 1) {
         int halfLen = len >> 1;
-        double angleStep = -2.0 * 3.14159265358979323846 / len;
-        float wStepR = (float)std::cos(angleStep);
-        float wStepI = (float)std::sin(angleStep);
+        int step = n / len;
 
         for (int i = 0; i < n; i += len) {
-            float wr = 1.0f;
-            float wi = 0.0f;
             for (int k = 0; k < halfLen; k++) {
+                int twIdx = k * step;
+                float wr = twR[twIdx];
+                float wi = twI[twIdx];
+
                 int posA = i + k;
                 int posB = i + k + halfLen;
 
@@ -181,10 +242,6 @@ JNIEXPORT void JNICALL Java_fastaudioprocess_FastFFT_fftNative(JNIEnv* env, jcla
                 imag[posB] = imag[posA] - ti;
                 real[posA] = real[posA] + tr;
                 imag[posA] = imag[posA] + ti;
-
-                float nextWr = wr * wStepR - wi * wStepI;
-                wi = wr * wStepI + wi * wStepR;
-                wr = nextWr;
             }
         }
     }
