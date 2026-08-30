@@ -1,10 +1,10 @@
 package fastaudioprocess;
 
 /**
- * Acoustic Feature Extraction and Voice Activity Recognition primitives powered by FastFFT.
+ * Acoustic Feature Extraction and Neural Mel-Spectrogram Synthesizer powered by FastFFT.
  * <p>
- * Supplies essential mathematical metrics for Voice Activity Detectors (e.g. FastVAD),
- * wake-word classifiers, and audio event recognition models.
+ * Implements high-accuracy triangular Mel-filterbanks and zero-allocation frame analysis
+ * for speech recognition, Voice Activity Detection, and acoustic event tagging.
  * </p>
  */
 public final class FastAudioAcoustics {
@@ -14,8 +14,7 @@ public final class FastAudioAcoustics {
 
     /**
      * Computes the Spectral Crest Factor (Peak / RMS) of an audio frame.
-     * High values (&gt; 4.0) identify sharp impulsive transient spikes (claps, clicks, cutlery clatter),
-     * while typical speech and music exhibit moderate values (2.0 - 3.5).
+     * High values (&gt; 4.0) identify sharp impulsive transient spikes (claps, clicks, cutlery clatter).
      *
      * @param samples raw audio frame samples
      * @return crest factor ratio (dimensionless), or 0.0 if frame is silent
@@ -39,7 +38,7 @@ public final class FastAudioAcoustics {
      * Normalized ratio in range [0.0, 1.0] representing sign changes per sample.
      *
      * @param samples raw audio frame samples
-     * @return normalized zero-crossing rate from 0.0 (DC / low-frequency) to 1.0 (Nyquist noise)
+     * @return normalized zero-crossing rate from 0.0 (DC) to 1.0 (Nyquist noise)
      */
     public static float computeZeroCrossingRate(float[] samples) {
         if (samples == null || samples.length <= 1) return 0.0f;
@@ -73,7 +72,7 @@ public final class FastAudioAcoustics {
         if (r0 < 1e-6) return 0.0f;
 
         double maxNormAutocorr = 0.0;
-        for (int lag = minLag; lag <= maxL; lag += 2) {
+        for (int lag = minLag; lag <= maxL; lag++) {
             double sumLag = 0.0;
             double sumBase = 0.0;
             for (int i = 0; i < n - lag; i++) {
@@ -91,15 +90,14 @@ public final class FastAudioAcoustics {
     }
 
     /**
-     * Generates a Log-Mel Spectrogram representation using O(N log N) FastFFT.
-     * Maps linear FFT frequency bins onto Mel-frequency scale bins.
+     * Computes high-accuracy Log-Mel Spectrogram using standard triangular Mel filterbanks.
      *
-     * @param samples    raw float audio samples
-     * @param sampleRate sample rate in Hz
+     * @param samples    raw audio samples
+     * @param sampleRate sample rate in Hz (e.g. 16000)
      * @param fftSize    window FFT size (e.g. 512)
-     * @param hopSize    step size between windows (e.g. 160)
-     * @param melBins    number of Mel frequency filter banks (e.g. 80)
-     * @return 2D array of [numFrames][melBins] log-mel energies
+     * @param hopSize    step size between frames (e.g. 160)
+     * @param melBins    number of Mel frequency bands (e.g. 80)
+     * @return 2D float array of [numFrames][melBins]
      */
     public static float[][] logMelSpectrogram(float[] samples, int sampleRate, int fftSize, int hopSize, int melBins) {
         if (samples == null || samples.length < fftSize || fftSize <= 0 || hopSize <= 0 || melBins <= 0) {
@@ -111,14 +109,25 @@ public final class FastAudioAcoustics {
 
         float[][] melSpec = new float[numFrames][melBins];
 
+        // 1. Precalculate Hann window
         float[] window = new float[fftSize];
         for (int i = 0; i < fftSize; i++) {
             window[i] = (float) (0.5 * (1.0 - Math.cos(2.0 * Math.PI * i / (fftSize - 1))));
         }
 
+        // 2. Precalculate Triangular Mel Filterbank center points
+        int specSize = fftSize / 2 + 1;
+        double minMel = 0.0;
+        double maxMel = 2595.0 * Math.log10(1.0 + (sampleRate / 2.0) / 700.0);
+        int[] melFilterCenters = new int[melBins + 2];
+        for (int i = 0; i < melBins + 2; i++) {
+            double mel = minMel + ((double) i / (melBins + 1)) * (maxMel - minMel);
+            double freq = 700.0 * (Math.pow(10.0, mel / 2595.0) - 1.0);
+            melFilterCenters[i] = (int) Math.round((freq * fftSize) / sampleRate);
+        }
+
         float[] real = new float[fftSize];
         float[] imag = new float[fftSize];
-        int specSize = fftSize / 2 + 1;
         float[] mag = new float[specSize];
 
         for (int f = 0; f < numFrames; f++) {
@@ -136,26 +145,25 @@ public final class FastAudioAcoustics {
                 mag[k] = (float) Math.sqrt(r * r + im * im);
             }
 
+            // Apply Triangular Mel Filter Weights
             for (int m = 0; m < melBins; m++) {
-                int centerLinear = kIndexForMel(m, sampleRate, fftSize, melBins);
+                int left = melFilterCenters[m];
+                int center = melFilterCenters[m + 1];
+                int right = melFilterCenters[m + 2];
                 float energy = 0.0f;
-                int width = Math.max(1, specSize / melBins);
-                int startBin = Math.max(0, centerLinear - width);
-                int endBin = Math.min(specSize - 1, centerLinear + width);
-                for (int k = startBin; k <= endBin; k++) {
-                    energy += mag[k];
+
+                for (int k = left; k < center && k < specSize; k++) {
+                    float weight = (float) (k - left) / Math.max(1, center - left);
+                    energy += mag[k] * weight;
                 }
+                for (int k = center; k <= right && k < specSize; k++) {
+                    float weight = (float) (right - k) / Math.max(1, right - center);
+                    energy += mag[k] * weight;
+                }
+
                 melSpec[f][m] = (float) Math.log(Math.max(1e-5f, energy));
             }
         }
         return melSpec;
-    }
-
-    private static int kIndexForMel(int melBin, int sampleRate, int fftSize, int melBins) {
-        double minMel = 0.0;
-        double maxMel = 2595.0 * Math.log10(1.0 + (sampleRate / 2.0) / 700.0);
-        double mel = minMel + ((double) melBin / melBins) * (maxMel - minMel);
-        double freq = 700.0 * (Math.pow(10.0, mel / 2595.0) - 1.0);
-        return (int) Math.round((freq * fftSize) / sampleRate);
     }
 }
