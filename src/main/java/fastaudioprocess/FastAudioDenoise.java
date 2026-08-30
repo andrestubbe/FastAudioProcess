@@ -4,17 +4,9 @@ package fastaudioprocess;
  * Real-Time Stationary Noise Cancellation and Dynamic Noise Gate Filters powered by FastFFT.
  * <p>
  * Implements in-place spectral power subtraction with musical noise over-subtraction protection,
- * Wiener gain floor smoothing, and block-based downward expander noise gating without heap allocations.
+ * Wiener gain floor smoothing, zero-padding tail protection for non-power-of-two frames,
+ * and block-based downward expander noise gating without heap allocations.
  * </p>
- *
- * <h2>Usage Example:</h2>
- * <pre>{@code
- * // 1. Real-time Spectral Noise Suppression
- * FastAudioDenoise.suppressNoise(frame512, 16000, 1.2f, 0.05f);
- *
- * // 2. Dynamic Noise Gate (-40dB threshold, -24dB reduction)
- * FastAudioDenoise.applyNoiseGate(frame512, -40.0f, -24.0f);
- * }</pre>
  */
 public final class FastAudioDenoise {
 
@@ -26,23 +18,21 @@ public final class FastAudioDenoise {
     }
 
     /**
-     * Suppresses stationary acoustic background noise (fans, hums, mic hiss) in-place
-     * using O(N log N) FastFFT spectral power subtraction with Wiener floor gain smoothing.
-     * <p>
-     * <b>Zero-Allocation Method</b>: Reuses thread-local scratch buffers without runtime heap allocation.
-     * </p>
+     * Suppresses stationary acoustic background noise in-place with zero-padding frame protection.
      *
-     * @param samples          raw audio frame samples (modified in-place, length should be &gt;= 32)
+     * @param samples          raw audio frame samples (modified in-place)
      * @param sampleRate       audio sampling rate in Hz (e.g. 16000 or 44100)
      * @param reductionFactor  noise attenuation factor (e.g. 0.85f for gentle, 1.5f for aggressive)
-     * @param spectralFloor    minimum spectral gain floor to prevent musical noise artifacts (e.g. 0.02f - 0.05f)
+     * @param spectralFloor    minimum spectral gain floor to prevent musical noise artifacts (e.g. 0.02f)
      */
     public static void suppressNoise(float[] samples, int sampleRate, float reductionFactor, float spectralFloor) {
         if (samples == null || samples.length < 32) return;
         int n = samples.length;
 
+        // Smallest power of 2 >= n to preserve all tail samples without dropping
         int fftSize = 1;
-        while ((fftSize << 1) <= n) fftSize <<= 1;
+        while (fftSize < n) fftSize <<= 1;
+        if (fftSize > 16384) fftSize = 16384;
 
         float[] real = TL_REAL.get();
         float[] imag = TL_IMAG.get();
@@ -57,14 +47,18 @@ public final class FastAudioDenoise {
             TL_MAG.set(mag);
         }
 
-        // 1. Hann Windowing into preallocated buffers
+        // 1. Hann Windowing + Zero-Padding
         for (int i = 0; i < fftSize; i++) {
-            float w = (float) (0.5 * (1.0 - Math.cos(2.0 * Math.PI * i / (fftSize - 1))));
-            real[i] = samples[i] * w;
+            if (i < n) {
+                float w = (float) (0.5 * (1.0 - Math.cos(2.0 * Math.PI * i / (n - 1))));
+                real[i] = samples[i] * w;
+            } else {
+                real[i] = 0.0f; // Zero-pad tail
+            }
             imag[i] = 0.0f;
         }
 
-        // 2. Forward FastFFT O(N log N)
+        // 2. Forward Native/Java FastFFT O(N log N)
         FastFFT.fft(real, imag);
 
         int half = fftSize / 2 + 1;
@@ -78,7 +72,7 @@ public final class FastAudioDenoise {
         }
         noiseEstimate = (noiseEstimate / half) * 0.25f;
 
-        // 3. Spectral Subtraction with Wiener floor protection
+        // 3. Spectral Subtraction
         for (int k = 0; k < half; k++) {
             float orig = mag[k];
             float cleaned = orig - (reductionFactor * noiseEstimate);
@@ -95,22 +89,15 @@ public final class FastAudioDenoise {
             }
         }
 
-        // 4. Inverse FastFFT O(N log N)
+        // 4. Inverse Native/Java FastFFT O(N log N)
         FastFFT.ifft(real, imag);
 
-        // 5. Commit back to input audio array
-        for (int i = 0; i < fftSize; i++) {
+        // 5. Restore full original length n
+        for (int i = 0; i < n; i++) {
             samples[i] = real[i];
         }
     }
 
-    /**
-     * Applies a block-based dynamic downward expander / noise gate to attenuate sub-threshold noise in-place.
-     *
-     * @param samples     audio buffer (modified in-place)
-     * @param thresholdDb threshold in decibels below which attenuation is applied (e.g. -40.0f)
-     * @param reductionDb attenuation reduction in decibels below threshold (e.g. -24.0f)
-     */
     public static void applyNoiseGate(float[] samples, float thresholdDb, float reductionDb) {
         if (samples == null || samples.length == 0) return;
         double threshold = Math.pow(10.0, thresholdDb / 20.0);

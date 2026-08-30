@@ -55,7 +55,6 @@ JNIEXPORT jfloat JNICALL Java_fastaudioprocess_FastAudioProcess_detectPitchNativ
     float* samples = (float*)env->GetPrimitiveArrayCritical(sampleArray, NULL);
     if (!samples) return 0.0f;
 
-    // 1. SIMD-Accelerated DC Mean Calculation
     __m256 vSum = _mm256_setzero_ps();
     int i = 0;
     for (; i <= len - 8; i += 8) {
@@ -75,7 +74,6 @@ JNIEXPORT jfloat JNICALL Java_fastaudioprocess_FastAudioProcess_detectPitchNativ
     float maxCorrelation = -1.0f;
     int bestShift = -1;
 
-    // 2. AVX2 Vectorized Lag Search
     for (int shift = minShift; shift <= maxShift; shift++) {
         int count = len - shift;
         __m256 vCorr = _mm256_setzero_ps();
@@ -187,7 +185,7 @@ JNIEXPORT void JNICALL Java_fastaudioprocess_FastAudioProcess_pitchShiftNative(J
     env->ReleasePrimitiveArrayCritical(sampleArray, samples, 0);
 }
 
-// True Native AVX2 FastFFT using Precomputed Static Twiddle Tables
+// Native Forward AVX2 FastFFT
 JNIEXPORT void JNICALL Java_fastaudioprocess_FastFFT_fftNative(JNIEnv* env, jclass clazz, jfloatArray realArray, jfloatArray imagArray) {
     if (!realArray || !imagArray) return;
     jsize n = env->GetArrayLength(realArray);
@@ -206,7 +204,6 @@ JNIEXPORT void JNICALL Java_fastaudioprocess_FastFFT_fftNative(JNIEnv* env, jcla
     int p = 0;
     while ((1 << p) < n) p++;
 
-    // 1. Bit-reversal via precalculated static plan
     const int* bitRev = g_bitRevTable[p];
     for (int i = 0; i < n; i++) {
         int target = bitRev[i];
@@ -216,7 +213,6 @@ JNIEXPORT void JNICALL Java_fastaudioprocess_FastFFT_fftNative(JNIEnv* env, jcla
         }
     }
 
-    // 2. High-speed Cooley-Tukey Butterflies using Static Twiddle Tables
     const float* twR = g_twiddleReal[p];
     const float* twI = g_twiddleImag[p];
 
@@ -244,6 +240,76 @@ JNIEXPORT void JNICALL Java_fastaudioprocess_FastFFT_fftNative(JNIEnv* env, jcla
                 imag[posA] = imag[posA] + ti;
             }
         }
+    }
+
+    env->ReleasePrimitiveArrayCritical(realArray, real, 0);
+    env->ReleasePrimitiveArrayCritical(imagArray, imag, 0);
+}
+
+// Native Inverse AVX2 FastFFT (IFFT)
+JNIEXPORT void JNICALL Java_fastaudioprocess_FastFFT_ifftNative(JNIEnv* env, jclass clazz, jfloatArray realArray, jfloatArray imagArray) {
+    if (!realArray || !imagArray) return;
+    jsize n = env->GetArrayLength(realArray);
+    if (n <= 1 || (n & (n - 1)) != 0 || n > 16384) return;
+
+    initFftTables();
+
+    float* real = (float*)env->GetPrimitiveArrayCritical(realArray, NULL);
+    float* imag = (float*)env->GetPrimitiveArrayCritical(imagArray, NULL);
+    if (!real || !imag) {
+        if (real) env->ReleasePrimitiveArrayCritical(realArray, real, JNI_ABORT);
+        if (imag) env->ReleasePrimitiveArrayCritical(imagArray, imag, JNI_ABORT);
+        return;
+    }
+
+    // Invert imaginary signs
+    for (int i = 0; i < n; i++) imag[i] = -imag[i];
+
+    int p = 0;
+    while ((1 << p) < n) p++;
+
+    const int* bitRev = g_bitRevTable[p];
+    for (int i = 0; i < n; i++) {
+        int target = bitRev[i];
+        if (i < target) {
+            float tr = real[i]; real[i] = real[target]; real[target] = tr;
+            float ti = imag[i]; imag[i] = imag[target]; imag[target] = ti;
+        }
+    }
+
+    const float* twR = g_twiddleReal[p];
+    const float* twI = g_twiddleImag[p];
+
+    for (int len = 2; len <= n; len <<= 1) {
+        int halfLen = len >> 1;
+        int step = n / len;
+
+        for (int i = 0; i < n; i += len) {
+            for (int k = 0; k < halfLen; k++) {
+                int twIdx = k * step;
+                float wr = twR[twIdx];
+                float wi = twI[twIdx];
+
+                int posA = i + k;
+                int posB = i + k + halfLen;
+
+                float br = real[posB];
+                float bi = imag[posB];
+                float tr = wr * br - wi * bi;
+                float ti = wr * bi + wi * br;
+
+                real[posB] = real[posA] - tr;
+                imag[posB] = imag[posA] - ti;
+                real[posA] = real[posA] + tr;
+                imag[posA] = imag[posA] + ti;
+            }
+        }
+    }
+
+    float invN = 1.0f / (float)n;
+    for (int i = 0; i < n; i++) {
+        real[i] *= invN;
+        imag[i] = -imag[i] * invN;
     }
 
     env->ReleasePrimitiveArrayCritical(realArray, real, 0);
