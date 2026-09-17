@@ -176,7 +176,7 @@ Captures low-latency Windows audio streams for `FastAudioProcess`.
 | Case | Java Example | Launcher | Description |
 |:---|:---|:---|:---|
 | **Interactive Showcase Demo** | [Demo.java](examples/Demo/src/main/java/fastaudioprocess/demo/Demo.java) | `run-demo.bat` | End-to-end interactive demonstration of real-time audio filters, noise suppression, and pitch modulation. |
-| **JMH Microbenchmark Suite** | [JMH_Audio.java](examples/Benchmark/src/main/java/fastaudioprocess/benchmark/JMH_Audio.java) | `run-benchmark.bat` | Formal OpenJDK JMH throughput measurements across native DSP audio kernels. |
+| **JMH Microbenchmark Suite** | [Benchmark.java](examples/Benchmark/src/main/java/fastaudioprocess/benchmark/Benchmark.java) | `run-benchmark.bat` | Formal OpenJDK JMH throughput measurements across native DSP audio kernels. |
 
 ---
 
