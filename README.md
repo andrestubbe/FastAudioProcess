@@ -68,6 +68,7 @@ public class Demo {
 - [Performance Benchmarks](#performance-benchmarks)
 - [Architecture Overview](#architecture-overview)
 - [API Quick Reference](#api-quick-reference)
+- [Technical Demos & Benchmarks](#technical-demos--benchmarks)
 - [Installation](#installation)
 - [Documentation](#documentation)
 - [Platform Support](#platform-support)
@@ -167,6 +168,15 @@ Captures low-latency Windows audio streams for `FastAudioProcess`.
 | `FastAudioEqualizer` | Stateful 3-band streaming IIR equalizer. | [Reference](docs/REFERENCE.md#equalizer) |
 | `FastAudioChunker` | Lock-free SPSC power-of-two frame chunker. | [Reference](docs/REFERENCE.md#chunker) |
 | `FastFFT` | Forward & inverse Radix-2 Fast Fourier Transform. | [Reference](docs/REFERENCE.md#fft) |
+
+---
+
+## Technical Demos & Benchmarks
+
+| Case | Java Example | Launcher | Description |
+|:---|:---|:---|:---|
+| **Interactive Showcase Demo** | [Demo.java](examples/Demo/src/main/java/fastaudioprocess/demo/Demo.java) | `run-demo.bat` | End-to-end interactive demonstration of real-time audio filters, noise suppression, and pitch modulation. |
+| **JMH Microbenchmark Suite** | [JMH_Audio.java](examples/Benchmark/src/main/java/fastaudioprocess/benchmark/JMH_Audio.java) | `run-benchmark.bat` | Formal OpenJDK JMH throughput measurements across native DSP audio kernels. |
 
 ---
 
