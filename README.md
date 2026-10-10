@@ -291,15 +291,15 @@ MIT License — See [LICENSE](LICENSE) for details.
 
 ## Related Projects
 
-- [FastVAD](https://github.com/andrestubbe/FastVAD) — Real-time Voice Activity Detection with sub-10ms latency
+- [FastCore](https://github.com/andrestubbe/FastCore) — Native library loader, FFM gateway, and platform abstraction
 - [FastAudioCapture](https://github.com/andrestubbe/FastAudioCapture) — Zero-copy WASAPI audio loopback & microphone capture
 - [FastAudioPlayer](https://github.com/andrestubbe/FastAudioPlayer) — Ultra low-latency WASAPI and DirectSound audio playback engine
-- [FastTurn](https://github.com/andrestubbe/FastTurn) — Real-time turn-taking and speech interruption latency detector
-- [FastWakeWord](https://github.com/andrestubbe/FastWakeWord) — Neural wake-word and keyword spotting detector
+- [FastVAD](https://github.com/andrestubbe/FastVAD) — Ultra-fast real-time Voice Activity Detection (Silero-ONNX & WebRTC)
+- [FastTurn](https://github.com/andrestubbe/FastTurn) — Real-time conversational turn-taking and speech arbitration
+- [FastTTS](https://github.com/andrestubbe/FastTTS) — Unified, zero-bloat text-to-speech backend orchestration
+- [FastSSML](https://github.com/andrestubbe/FastSSML) — High-performance SSML parsing and speech synthesis markup
 - [FastSTT](https://github.com/andrestubbe/FastSTT) — High-throughput local speech-to-text recognition
-- [FastTTS](https://github.com/andrestubbe/FastTTS) — Low-latency neural text-to-speech synthesis
-- [FastSIMD](https://github.com/andrestubbe/FastSIMD) — Hardware SIMD vectorization primitives
-- [FastCore](https://github.com/andrestubbe/FastCore) — Native JNI Loader and Utilities
+- [FastWakeWord](https://github.com/andrestubbe/FastWakeWord) — Neural wake-word and keyword spotting detector
 
 ---
 
