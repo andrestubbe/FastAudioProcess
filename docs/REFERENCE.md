@@ -30,6 +30,18 @@ public static native void pitchShiftNative(float[] samples, float semitones, int
 ```
 Modulates the pitch of audio samples in-place using zero-allocation time-domain modulation with persistent 16,384-sample delay lines.
 
+### `applyVolumeGain`
+```java
+public static void applyVolumeGain(byte[] pcmData, double volumeMultiplier)
+```
+Scales 16-bit linear PCM audio buffers (up to 300% boost) with continuous hyperbolic tangent (`tanh`) soft-knee saturation limiting to prevent digital clipping above 85% peak amplitude.
+
+### `timeStretchWSOLA`
+```java
+public static float[] timeStretchWSOLA(float[] input, float speedRatio, int sampleRate)
+```
+Performs high-fidelity Waveform Similarity Overlap-Add (WSOLA) pitch-invariant time-scale modification. Adjusts audio playback speed without altering vocal pitch or timbre.
+
 ---
 
 ## 2. Fast Fourier Transform (`FastFFT`)

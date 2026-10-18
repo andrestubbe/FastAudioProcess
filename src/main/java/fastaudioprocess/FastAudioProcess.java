@@ -428,4 +428,132 @@ public final class FastAudioProcess {
             return delegate.availableSamples();
         }
     }
-}
+
+    // ── Time-Scale Modification (WSOLA) & Volume Post-Processing ─────────────
+
+    /**
+     * Scales 16-bit PCM audio samples with soft-limiting saturation (tanh-like soft-knee).
+     * Prevents harsh digital clipping when volume boost > 1.0 (e.g. up to 2.0 or 3.0 like VLC 200%-300%).
+     *
+     * @param pcmData          raw 16-bit PCM byte array
+     * @param volumeMultiplier gain factor (e.g. 1.0 = 100%, 1.5 = 150%, 2.0 = 200%)
+     * @return boosted PCM byte array (new array or original if multiplier <= 1.0)
+     */
+    public static byte[] applyVolumeGain(byte[] pcmData, double volumeMultiplier) {
+        if (pcmData == null || pcmData.length < 2 || volumeMultiplier <= 1.0) {
+            return pcmData;
+        }
+        int numSamples = pcmData.length / 2;
+        byte[] boosted = new byte[pcmData.length];
+        double gain = volumeMultiplier;
+
+        for (int i = 0; i < numSamples; i++) {
+            int idx = i * 2;
+            short s = (short) ((pcmData[idx + 1] << 8) | (pcmData[idx] & 0xFF));
+            double sample = s * gain;
+
+            // Soft-knee limiting (tanh / cubic soft saturation) beyond 85% threshold
+            if (sample > 28000.0) {
+                double excess = sample - 28000.0;
+                sample = 28000.0 + 4767.0 * Math.tanh(excess / 4767.0);
+            } else if (sample < -28000.0) {
+                double excess = sample + 28000.0;
+                sample = -28000.0 + 4768.0 * Math.tanh(excess / 4768.0);
+            }
+
+            short outSample = (short) Math.round(sample);
+            boosted[idx] = (byte) (outSample & 0xFF);
+            boosted[idx + 1] = (byte) ((outSample >> 8) & 0xFF);
+        }
+        return boosted;
+    }
+
+    /**
+     * Modifies the playback speed / duration of audio samples using Waveform Similarity
+     * Overlap-Add (WSOLA) without altering the pitch.
+     *
+     * @param input      normalized float audio samples in [-1.0, 1.0]
+     * @param speedRatio playback speed multiplier (e.g. 1.25 = 25% faster, 0.8 = 20% slower)
+     * @param sampleRate audio sampling rate in Hz (e.g. 16000, 24000, 44100)
+     * @return time-stretched float sample array with unaltered pitch
+     */
+    public static float[] timeStretchWSOLA(float[] input, float speedRatio, int sampleRate) {
+        if (input == null || input.length == 0 || speedRatio <= 0.0f || Math.abs(speedRatio - 1.0f) < 0.01f) {
+            return input;
+        }
+
+        // Frame parameters adjusted for speech fundamental frequency range (~80Hz - 400Hz)
+        int N = Math.max(128, (int) (sampleRate * 0.025f)); // 25ms window
+        if ((N & 1) != 0) N++; // ensure even
+        int synthesisHop = N / 2;
+        int analysisHop = Math.round(synthesisHop * speedRatio);
+        int maxDelta = N / 2; // cross-correlation search range around nominal analysis position
+
+        // Hann synthesis window
+        float[] window = new float[N];
+        for (int i = 0; i < N; i++) {
+            window[i] = (float) (0.5 * (1.0 - Math.cos((2.0 * Math.PI * i) / N)));
+        }
+
+        int estimatedOutputLength = (int) Math.ceil(input.length / (double) speedRatio) + N;
+        float[] output = new float[estimatedOutputLength];
+        float[] normWeights = new float[estimatedOutputLength];
+
+        int synthesisPos = 0;
+        int nominalAnalysisPos = 0;
+        int prevAnalysisPos = 0;
+
+        while (nominalAnalysisPos + N + maxDelta < input.length) {
+            int bestAnalysisPos = nominalAnalysisPos;
+
+            // Find optimal overlap position using normalized cross-correlation
+            if (synthesisPos > 0) {
+                int searchStart = Math.max(0, nominalAnalysisPos - maxDelta);
+                int searchEnd = Math.min(input.length - N, nominalAnalysisPos + maxDelta);
+
+                double maxCorr = -Double.MAX_VALUE;
+                int targetOverlap = prevAnalysisPos + synthesisHop;
+
+                for (int pos = searchStart; pos <= searchEnd; pos += 2) {
+                    double crossCorr = 0.0;
+                    double energy = 1e-6;
+                    for (int k = 0; k < N; k += 4) {
+                        float s1 = input[targetOverlap + k];
+                        float s2 = input[pos + k];
+                        crossCorr += s1 * s2;
+                        energy += s2 * s2;
+                    }
+                    double normCorr = crossCorr / Math.sqrt(energy);
+                    if (normCorr > maxCorr) {
+                        maxCorr = normCorr;
+                        bestAnalysisPos = pos;
+                    }
+                }
+            }
+
+            // Overlap-Add with Hann window
+            for (int i = 0; i < N; i++) {
+                int outIdx = synthesisPos + i;
+                if (outIdx < output.length) {
+                    float w = window[i];
+                    output[outIdx] += input[bestAnalysisPos + i] * w;
+                    normWeights[outIdx] += w;
+                }
+            }
+
+            prevAnalysisPos = bestAnalysisPos;
+            nominalAnalysisPos += analysisHop;
+            synthesisPos += synthesisHop;
+        }
+
+        // Normalize overlap weights to preserve exact signal amplitude
+        int finalLength = Math.max(1, synthesisPos);
+        float[] trimmed = new float[finalLength];
+        for (int i = 0; i < finalLength; i++) {
+            float w = normWeights[i];
+            trimmed[i] = (w > 1e-4f) ? (output[i] / w) : output[i];
+        }
+
+        return trimmed;
+    }
+}

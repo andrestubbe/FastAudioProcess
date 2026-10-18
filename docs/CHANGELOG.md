@@ -1,5 +1,14 @@
 # FastAudioProcess Changelog
 
+## [0.1.5] - 2026-10-19
+- **VLC-Style Volume Boost & Soft-Limiter Gain (`applyVolumeGain`)**:
+  - Amplifies 16-bit PCM audio up to 300% (`volumeMultiplier > 1.0`, e.g. 1.8 for 180%).
+  - Soft-knee saturation limiter via hyperbolic tangent (`tanh`) compression starting at ~85% peak amplitude (28,000 threshold), preventing harsh digital clipping and maintaining full vocal warmth.
+- **Pitch-Invariant Time-Scale Modification (`timeStretchWSOLA`)**:
+  - True Waveform Similarity Overlap-Add (WSOLA) time-stretching adjusting tempo (`speedRatio` > 1.0 or < 1.0) without altering pitch.
+  - Zero Mickey-Mouse pitch shifting artifacts; preserves fundamental voice formants and natural speech acoustics.
+  - Voice-optimized 25ms Hann-window analysis with normalized cross-correlation (80 Hz – 400 Hz range) and overlap weight normalization.
+
 ## [0.1.4] - 2026-08-30
 - **True AVX2 SIMD Pitch Tracking**: 256-bit `_mm256_fmadd_ps` Fused-Multiply-Add autocorrelation with DC-Mean removal.
 - **Native & Java FastFFT**: O(N log N) in-place Cooley-Tukey Radix-2 FFT and IFFT with precomputed static twiddle factor tables and `std::call_once` thread-safe initialization.
