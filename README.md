@@ -1,10 +1,10 @@
-# FastAudioProcess 0.1.5 [ALPHA-2026-10-19] — High-Performance Audio Processing for Java
+# FastAudioProcess 0.1.6 [ALPHA-2026-10-19] — High-Performance Audio Processing for Java
 
-[![Status](https://img.shields.io/badge/status-0.1.5-brightgreen.svg)](https://github.com/andrestubbe/FastAudioProcess/releases/tag/0.1.5)
+[![Status](https://img.shields.io/badge/status-0.1.6-brightgreen.svg)](https://github.com/andrestubbe/FastAudioProcess/releases/tag/0.1.6)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Java](https://img.shields.io/badge/Java-17+-blue.svg)](https://www.java.com)
 [![Platform](https://img.shields.io/badge/Platform-Windows%2010+-lightgrey.svg)]()
-[![JitPack](https://img.shields.io/badge/JitPack-0.1.5-green.svg)](https://jitpack.io/#andrestubbe/FastAudioProcess)
+[![JitPack](https://img.shields.io/badge/JitPack-0.1.6-green.svg)](https://jitpack.io/#andrestubbe/FastAudioProcess)
 
 ---
 
@@ -103,9 +103,9 @@ Standard Java audio loops suffer from float boxing overhead, slow software resam
 * **🔇 Real-Time Noise Suppression** — High-speed spectral subtraction & Wiener gain smoothing for studio voice isolation.
 * **🔊 VLC-Style Volume Boost & Soft-Limiter** — Volume scaling up to 300% on 16-bit PCM with continuous `tanh` soft-knee saturation limiting preventing harsh digital clipping.
 * **⏱️ Pitch-Invariant Time-Stretching (WSOLA)** — High-fidelity Waveform Similarity Overlap-Add algorithm for speed adjustment (speedRatio > 1.0 or < 1.0) with Hann windowing and zero Mickey-Mouse pitch distortion.
+* **🎵 Clean Echo-Free Pitch-Shifting (`pitchShift`)** — High-quality musical semitone shifting (-12.0 to +12.0) combining WSOLA duration pre-expansion with phase-aligned resampling, completely eliminating flanging and circular echo artifacts.
 * **📊 Acoustic Feature Extraction** — Zero-allocation Crest Factor, Zero-Crossing Rate (ZCR), and Harmonic Periodicity primitives.
 * **🎤 Real-Time Pitch Tracking** — High-speed autocorrelation pitch estimator for voice and instrument tuning.
-* **🎵 SOLA Pitch Shifter** — Native time-domain pitch shifter preserving audio duration and tempo.
 * **🎛️ Zero-GC DSP Filters** — Multi-channel gain, 3-band equalizer, dynamic noise gate, and FIR filters.
 * **🔄 Interoperable Java Audio Bridge** — Seamless conversion to and from standard `javax.sound.sampled` formats.
 
@@ -201,7 +201,7 @@ Add the JitPack repository and the complete dependency stack to your `pom.xml`:
     <dependency>
         <groupId>com.github.andrestubbe</groupId>
         <artifactId>FastAudioProcess</artifactId>
-        <version>0.1.5</version>
+        <version>0.1.6</version>
     </dependency>
 
     <!-- FastSIMD Hardware Vector Acceleration Engine -->
@@ -244,7 +244,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.github.andrestubbe:FastAudioProcess:0.1.5'
+    implementation 'com.github.andrestubbe:FastAudioProcess:0.1.6'
     implementation 'com.github.andrestubbe:FastSIMD:0.1.3'
     implementation 'com.github.andrestubbe:FastMemory:0.1.1'
     implementation 'com.github.andrestubbe:FastPointer:0.1.1'
@@ -256,7 +256,7 @@ dependencies {
 
 Download the latest JAR directly to add it to your classpath:
 
-1. 📦 **[FastAudioProcess-0.1.5.jar](https://github.com/andrestubbe/FastAudioProcess/releases/download/0.1.5/FastAudioProcess-0.1.5.jar)** (The Core Library)
+1. 📦 **[FastAudioProcess-0.1.6.jar](https://github.com/andrestubbe/FastAudioProcess/releases/download/0.1.6/FastAudioProcess-0.1.6.jar)** (The Core Library)
 2. 📦 **[FastSIMD-0.1.3.jar](https://github.com/andrestubbe/FastSIMD/releases/download/0.1.3/FastSIMD-0.1.3.jar)** (Vector Math Substrate)
 3. 📦 **[FastMemory-0.1.1.jar](https://github.com/andrestubbe/FastMemory/releases/download/0.1.1/FastMemory-0.1.1.jar)** (Aligned Off-Heap Allocator)
 4. 📦 **[FastPointer-0.1.1.jar](https://github.com/andrestubbe/FastPointer/releases/download/0.1.1/FastPointer-0.1.1.jar)** (Memory Address Wrapper)

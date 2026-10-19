@@ -1,13 +1,24 @@
 # FastAudioProcess Changelog
 
-## [0.1.5] - 2026-10-19
-- **VLC-Style Volume Boost & Soft-Limiter Gain (`applyVolumeGain`)**:
-  - Amplifies 16-bit PCM audio up to 300% (`volumeMultiplier > 1.0`, e.g. 1.8 for 180%).
-  - Soft-knee saturation limiter via hyperbolic tangent (`tanh`) compression starting at ~85% peak amplitude (28,000 threshold), preventing harsh digital clipping and maintaining full vocal warmth.
-- **Pitch-Invariant Time-Scale Modification (`timeStretchWSOLA`)**:
-  - True Waveform Similarity Overlap-Add (WSOLA) time-stretching adjusting tempo (`speedRatio` > 1.0 or < 1.0) without altering pitch.
-  - Zero Mickey-Mouse pitch shifting artifacts; preserves fundamental voice formants and natural speech acoustics.
-  - Voice-optimized 25ms Hann-window analysis with normalized cross-correlation (80 Hz – 400 Hz range) and overlap weight normalization.
+## [0.1.6] - 2026-10-19
+- **True WSOLA Time-Stretching (`timeStretchWSOLA`)**:
+  - Implementation of Waveform Similarity Overlap-Add (WSOLA) tuned specifically for speech fundamental frequencies (80 Hz – 400 Hz).
+  - Employs a 25ms Hann synthesis window with normalized cross-correlation search across nominal analysis positions.
+  - Modifies playback speed (`speedRatio > 1.0` = faster, `speedRatio < 1.0` = slower) while keeping pitch/frequency 100% constant.
+  - Eliminates "chipmunk / Mickey-Mouse" and "monster voice" artifacts of linear resampling.
+  - Normalizes overlap weights at the output to preserve exact signal amplitude across all frames.
+- **Clean Echo-Free Pitch-Shifting (`pitchShift`)**:
+  - Solves metallic flanging and circular echo artifacts present in fixed-size native delay-line pitch shifters.
+  - Pairs WSOLA time-stretching with phase-aligned linear resampling:
+    1. Audio duration is pre-stretched by `(1.0 / pitchFactor)` using WSOLA.
+    2. The signal is resampled back to the original sample duration.
+  - Frequencies shift smoothly up or down (in musical semitones, e.g. `-12.0` to `+12.0`) while audio duration and transients remain intact.
+- **VLC-Style Volume Boost & Soft-Knee Limiter (`applyVolumeGain`)**:
+  - Safely amplifies 16-bit signed PCM audio beyond standard 100% ceiling (up to 300% / `volumeMultiplier = 3.0`), mimicking VLC's volume boost.
+  - Incorporates an analog-style soft-knee saturation limiter:
+    - Signals below 85% full scale (`28,000` on 16-bit) receive clean linear gain.
+    - Signals above 85% are smoothed using a continuous Hyperbolic Tangent (`tanh`) compression curve up to the ceiling (`32,767`).
+  - Completely prevents harsh digital square-wave clipping, distortion, and speaker popping.
 
 ## [0.1.4] - 2026-08-30
 - **True AVX2 SIMD Pitch Tracking**: 256-bit `_mm256_fmadd_ps` Fused-Multiply-Add autocorrelation with DC-Mean removal.

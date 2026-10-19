@@ -30,6 +30,12 @@ public static native void pitchShiftNative(float[] samples, float semitones, int
 ```
 Modulates the pitch of audio samples in-place using zero-allocation time-domain modulation with persistent 16,384-sample delay lines.
 
+### `pitchShift`
+```java
+public static float[] pitchShift(float[] input, float semitones, int sampleRate)
+```
+High-fidelity, echo-free musical pitch shifting. Pairs pitch-invariant WSOLA time-stretching with phase-aligned linear resampling to shift frequencies (in semitones, e.g. `-12.0` to `+12.0`) without metallic flanging, circular echoes, or altering audio playback duration.
+
 ### `applyVolumeGain`
 ```java
 public static void applyVolumeGain(byte[] pcmData, double volumeMultiplier)

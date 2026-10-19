@@ -556,4 +556,46 @@ public final class FastAudioProcess {
 
         return trimmed;
     }
+
+    /**
+     * Shifts the pitch of an audio signal by the given musical semitones without modifying duration
+     * and without circular echo artifacts.
+     * <p>
+     * Accomplished by pairing Waveform Similarity Overlap-Add (WSOLA) time-stretching with high-speed
+     * resampling (the gold-standard clean pitch-shifting approach in professional DSP).
+     * </p>
+     *
+     * @param input      raw float samples
+     * @param semitones  semitones shift (+/-), e.g. +4.0f or -3.0f
+     * @param sampleRate sampling rate in Hz (e.g. 22050, 44100)
+     * @return clean pitch-shifted float sample array
+     */
+    public static float[] pitchShift(float[] input, float semitones, int sampleRate) {
+        if (input == null || input.length == 0 || Math.abs(semitones) < 0.05f) {
+            return input;
+        }
+
+        double pitchFactor = Math.pow(2.0, semitones / 12.0); // e.g. 1.35
+        // To increase pitch, audio must be played back faster (resample step > 1),
+        // so WSOLA must first expand duration (speed = 1.0 / pitchFactor) to preserve length!
+        float[] stretched = timeStretchWSOLA(input, (float) (1.0 / pitchFactor), sampleRate);
+
+        // 2. Resample back to original sample duration, which shifts the frequencies clean without echo
+        int targetLength = input.length;
+        float[] output = new float[targetLength];
+        double resampleStep = (double) (stretched.length - 1) / Math.max(1, targetLength - 1);
+
+        for (int i = 0; i < targetLength; i++) {
+            double srcIdx = i * resampleStep;
+            int base = (int) srcIdx;
+            double frac = srcIdx - base;
+            if (base < stretched.length - 1) {
+                output[i] = (float) ((1.0 - frac) * stretched[base] + frac * stretched[base + 1]);
+            } else {
+                output[i] = stretched[stretched.length - 1];
+            }
+        }
+
+        return output;
+    }
 }
